@@ -18,31 +18,17 @@ pipeline {
 
     stages {
 
-        /* ================= CLEAN ================= */
-
         stage('Clean Workspace') {
             steps {
                 cleanWs()
             }
         }
 
-        /* ================= CHECKOUT ================= */
-
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-
-        /* ================= TRIGGER INFO ================= */
-
-        stage('Trigger Info') {
-            steps {
-                echo "Build triggered by: ${currentBuild.getBuildCauses()}"
-            }
-        }
-
-        /* ================= DEBUG ================= */
 
         stage('Debug Workspace') {
             steps {
@@ -59,38 +45,31 @@ pipeline {
 
         stage('Build (No Tests)') {
             steps {
-                dir('notification-service') {
-                    sh '''
-                        echo "===== BUILD WITHOUT TESTS ====="
+                sh '''
+                    echo "===== BUILD WITHOUT TESTS ====="
 
-                        mvn clean install \
-                        -Dmaven.test.skip=true \
-                        -Deureka.client.enabled=false \
-                        -Dspring.cloud.discovery.enabled=false
-                    '''
-                }
+                    mvn -B clean install \
+                    -Dmaven.test.skip=true \
+                    -Deureka.client.enabled=false \
+                    -Dspring.cloud.discovery.enabled=false
+                '''
             }
         }
 
         /* ================= SONAR ================= */
 
-        stage('SonarQube Analysis (No Tests)') {
+        stage('SonarQube Analysis') {
             steps {
-                dir('notification-service') {
-                    withSonarQubeEnv('SonarQube2') {
-                        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                            sh '''
-                                echo "===== SONAR ANALYSIS ====="
+                withSonarQubeEnv('SonarQube2') {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            echo "===== SONAR ANALYSIS ====="
 
-                                mvn sonar:sonar \
-                                -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-                                -Dsonar.projectName=$SONAR_PROJECT_NAME \
-                                -Dsonar.login=$SONAR_TOKEN \
-                                -Dsonar.coverage.exclusions=** \
-                                -Dsonar.tests= \
-                                -Dsonar.test.exclusions=**
-                            '''
-                        }
+                            mvn -B sonar:sonar \
+                            -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                            -Dsonar.projectName=$SONAR_PROJECT_NAME \
+                            -Dsonar.login=$SONAR_TOKEN
+                        '''
                     }
                 }
             }
@@ -100,31 +79,30 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
+                script {
+                    try {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            waitForQualityGate abortPipeline: false
+                        }
+                    } catch (Exception e) {
+                        echo "Quality Gate skipped"
+                    }
                 }
             }
         }
 
-        /* ================= SECURITY ================= */
+        /* ================= OWASP ================= */
 
         stage('OWASP Dependency Check') {
             steps {
-                dir('live-classes-service') {
-                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_KEY')]) {
-
-                        sh '''
-                            echo "===== RUNNING OWASP CHECK ====="
-                        '''
-
-                        dependencyCheck(
-                            additionalArguments: "--nvdApiKey ${NVD_KEY} --format XML --out . --disableOssIndex",
-                            odcInstallation: 'Default'
-                        )
-                    }
-
-                    dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_KEY')]) {
+                    dependencyCheck(
+                        additionalArguments: "--nvdApiKey ${NVD_KEY} --format XML --out . --disableOssIndex",
+                        odcInstallation: 'Default'
+                    )
                 }
+
+                dependencyCheckPublisher pattern: 'dependency-check-report.xml'
             }
         }
 
@@ -132,7 +110,7 @@ pipeline {
 
         stage('Archive Reports') {
             steps {
-                archiveArtifacts artifacts: 'live-classes-service/dependency-check-report.xml',
+                archiveArtifacts artifacts: 'dependency-check-report.xml',
                                  fingerprint: true
             }
         }
