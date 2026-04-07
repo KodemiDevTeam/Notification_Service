@@ -1,0 +1,45 @@
+spring:
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${EMAIL_USER}
+    password: ${EMAIL_PASS}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  application:
+    name: notification-service
+  task:
+    scheduling:
+          pool:
+            size: 5
+
+aws:
+  region: us-east-1
+  accessKeyId: 5ceh4k
+  secretKey: 35ffjb
+  dynamodb:
+    endpoint: http://localhost:8000
+
+dynamodb:
+  table:
+    name: notifications
+
+logging:
+  level:
+    root: INFO
+    service: DEBUG
+    repository: DEBUG
+
+
+notification:
+  scheduler:
+    interval: 10000   # 10 seconds
+    max-retry: 3
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID}
+  auth-token: ${TWILIO_AUTH_TOKEN}
+  phone-number: ${TWILIO_PHONE_NUMBER}
