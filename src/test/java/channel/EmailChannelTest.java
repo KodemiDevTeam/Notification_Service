@@ -1,7 +1,7 @@
 package channel;
 
-import org.Notification.channel.EmailChannel;
-import org.Notification.model.Notification;
+import org.notification.channel.EmailChannel;
+import org.notification.model.Notification;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

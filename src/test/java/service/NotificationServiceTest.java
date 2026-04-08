@@ -1,13 +1,13 @@
 package service;
 
-import org.Notification.model.Notification;
-import org.Notification.model.enums.NotificationType;
-import org.Notification.repository.NotificationRepository;
-import org.Notification.repository.UserPreferenceRepository;
-import org.Notification.service.NotificationService;
-import org.Notification.service.EmailService;
-import org.Notification.service.SmsService;
-import org.Notification.service.InAppService;
+import org.notification.model.Notification;
+import org.notification.model.enums.NotificationType;
+import org.notification.repository.NotificationRepository;
+import org.notification.repository.UserPreferenceRepository;
+import org.notification.service.NotificationService;
+import org.notification.service.EmailService;
+import org.notification.service.SmsService;
+import org.notification.service.InAppService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

@@ -1,7 +1,7 @@
 package channel;
 
-import org.Notification.channel.PushChannel;
-import org.Notification.model.Notification;
+import org.notification.channel.PushChannel;
+import org.notification.model.Notification;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

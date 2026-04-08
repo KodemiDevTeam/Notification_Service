@@ -1,9 +1,9 @@
 package controller;
 
-import org.Notification.controller.InAppController;
-import org.Notification.model.InAppNotification;
-import org.Notification.repository.InAppRepository;
-import org.Notification.security.JwtUtil;
+import org.notification.controller.InAppController;
+import org.notification.model.InAppNotification;
+import org.notification.repository.InAppRepository;
+import org.notification.security.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

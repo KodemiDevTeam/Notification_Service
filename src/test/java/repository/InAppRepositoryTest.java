@@ -1,7 +1,7 @@
 package repository;
 
-import org.Notification.model.InAppNotification;
-import org.Notification.repository.InAppRepository;
+import org.notification.model.InAppNotification;
+import org.notification.repository.InAppRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

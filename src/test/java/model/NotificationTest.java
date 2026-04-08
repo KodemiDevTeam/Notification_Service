@@ -1,7 +1,7 @@
 package model;
 
-import org.Notification.model.Notification;
-import org.Notification.model.enums.NotificationType;
+import org.notification.model.Notification;
+import org.notification.model.enums.NotificationType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,7 +35,8 @@ class NotificationTest {
         Notification n = new Notification();
         assertNull(n.getNotificationId());
         assertNull(n.getUserId());
-        assertNull(n.getStatus());
+        // status defaults to "PENDING" per model definition
+        assertEquals("PENDING", n.getStatus());
     }
 
     @Test

@@ -1,14 +1,21 @@
 package channel;
 
-import org.Notification.channel.SmsChannel;
-import org.Notification.model.Notification;
+import org.notification.channel.SmsChannel;
+import org.notification.model.Notification;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SmsChannelTest {
 
-    private final SmsChannel smsChannel = new SmsChannel();
+    private SmsChannel smsChannel;
+
+    @BeforeEach
+    void setUp() {
+        // Provide dummy Twilio config values to satisfy constructor injection
+        smsChannel = new SmsChannel("dummy-sid", "dummy-token", "+10000000000");
+    }
 
     @Test
     void getChannelName_shouldReturnSMS() {
@@ -37,10 +44,10 @@ class SmsChannelTest {
     }
 
     @Test
-    void send_shouldThrowWhenMessageIsNull() {
+    void send_shouldThrowWhenMessageIsEmpty() {
         Notification n = new Notification();
         n.setPhoneNumber("1234567890");
-        // getMessage() returns "" so this won't throw for null but for empty
+        // getMessage() returns "" which is blank, so InvalidMessageException is thrown
         assertThrows(RuntimeException.class, () -> smsChannel.send(n));
     }
 }

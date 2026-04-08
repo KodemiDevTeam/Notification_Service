@@ -1,9 +1,9 @@
 package channel;
 
-import org.Notification.channel.InAppChannel;
-import org.Notification.model.InAppNotification;
-import org.Notification.model.Notification;
-import org.Notification.repository.InAppRepository;
+import org.notification.channel.InAppChannel;
+import org.notification.model.InAppNotification;
+import org.notification.model.Notification;
+import org.notification.repository.InAppRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

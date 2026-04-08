@@ -1,12 +1,11 @@
 package service;
 
-import org.Notification.channel.EmailChannel;
-import org.Notification.channel.InAppChannel;
-import org.Notification.channel.NotificationChannel;
-import org.Notification.channel.PushChannel;
-import org.Notification.channel.SmsChannel;
-import org.Notification.model.Notification;
-import org.Notification.service.ChannelDispatcherService;
+import org.notification.channel.EmailChannel;
+import org.notification.channel.InAppChannel;
+import org.notification.channel.PushChannel;
+import org.notification.channel.SmsChannel;
+import org.notification.model.Notification;
+import org.notification.service.ChannelDispatcherService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,8 +1,8 @@
 package repository;
 
-import org.Notification.model.Notification;
-import org.Notification.model.enums.NotificationType;
-import org.Notification.repository.NotificationRepository;
+import org.notification.model.Notification;
+import org.notification.model.enums.NotificationType;
+import org.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

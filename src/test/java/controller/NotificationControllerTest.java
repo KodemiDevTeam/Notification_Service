@@ -1,11 +1,11 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.Notification.controller.NotificationController;
-import org.Notification.model.Notification;
-import org.Notification.model.enums.NotificationType;
-import org.Notification.security.JwtUtil;
-import org.Notification.service.NotificationService;
+import org.notification.controller.NotificationController;
+import org.notification.model.Notification;
+import org.notification.model.enums.NotificationType;
+import org.notification.security.JwtUtil;
+import org.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

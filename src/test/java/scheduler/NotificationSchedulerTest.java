@@ -1,16 +1,15 @@
 package scheduler;
 
-import org.Notification.model.Notification;
-import org.Notification.model.enums.NotificationType;
-import org.Notification.repository.NotificationRepository;
-import org.Notification.scheduler.NotificationScheduler;
-import org.Notification.service.ChannelDispatcherService;
+import org.notification.model.Notification;
+import org.notification.model.enums.NotificationType;
+import org.notification.repository.NotificationRepository;
+import org.notification.scheduler.NotificationScheduler;
+import org.notification.service.ChannelDispatcherService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -22,11 +21,17 @@ class NotificationSchedulerTest {
 
     @Mock NotificationRepository repo;
     @Mock ChannelDispatcherService dispatcher;
-    @InjectMocks NotificationScheduler scheduler;
+
+    private NotificationScheduler scheduler;
+
+    @BeforeEach
+    void setUp() {
+        // Manually construct since @Value maxRetry can't be injected by @InjectMocks
+        scheduler = new NotificationScheduler(repo, dispatcher, 3);
+    }
 
     @Test
     void run_shouldDoNothingWhenNoNotifications() {
-        ReflectionTestUtils.setField(scheduler, "maxRetry", 3);
         when(repo.findAll()).thenReturn(List.of());
 
         scheduler.run();
@@ -36,7 +41,6 @@ class NotificationSchedulerTest {
 
     @Test
     void run_shouldDispatchPendingNotification() {
-        ReflectionTestUtils.setField(scheduler, "maxRetry", 3);
         Notification n = buildNotification("PENDING");
         when(repo.findAll()).thenReturn(List.of(n));
 
@@ -48,7 +52,6 @@ class NotificationSchedulerTest {
 
     @Test
     void run_shouldSkipNonPendingNotifications() {
-        ReflectionTestUtils.setField(scheduler, "maxRetry", 3);
         Notification n = buildNotification("SENT");
         when(repo.findAll()).thenReturn(List.of(n));
 
@@ -59,7 +62,6 @@ class NotificationSchedulerTest {
 
     @Test
     void run_shouldMarkFailedWhenMaxRetriesReached() {
-        ReflectionTestUtils.setField(scheduler, "maxRetry", 3);
         Notification n = buildNotification("PENDING");
         n.setRetryCount(3);
         when(repo.findAll()).thenReturn(List.of(n));
@@ -73,7 +75,6 @@ class NotificationSchedulerTest {
 
     @Test
     void run_shouldIncrementRetryCountOnFailure() {
-        ReflectionTestUtils.setField(scheduler, "maxRetry", 3);
         Notification n = buildNotification("PENDING");
         n.setRetryCount(1);
         when(repo.findAll()).thenReturn(List.of(n));
@@ -82,6 +83,8 @@ class NotificationSchedulerTest {
         scheduler.run();
 
         assertEquals(2, n.getRetryCount());
+        // status stays PENDING while retries remain
+        assertEquals("PENDING", n.getStatus());
     }
 
     private Notification buildNotification(String status) {

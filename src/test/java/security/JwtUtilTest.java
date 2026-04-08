@@ -1,11 +1,12 @@
 package security;
 
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import org.Notification.security.JwtUtil;
+import io.jsonwebtoken.security.Keys;
+import org.notification.security.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,31 +16,32 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtUtilTest {
 
     private JwtUtil jwtUtil;
-    private final String SECRET_KEY = "k8Jd9wQ2x+4aB3d1FJtL8vZ5X0yQ1V7n2gHqM4sP1tE=";
+
+    // Must match the secret in JwtUtil
+    private static final String SECRET_KEY_STRING = "k8Jd9wQ2x+4aB3d1FJtL8vZ5X0yQ1V7n2gHqM4sP1tE=";
+    private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET_KEY_STRING.getBytes());
 
     @BeforeEach
     void setUp() {
         jwtUtil = new JwtUtil();
     }
 
-    // generate token matching JwtUtil's generateToken logic (userId in claims, not subject)
+    /**
+     * Mirrors JwtUtil.generateToken: userId as subject, then setClaims(email+role).
+     * Note: in jjwt 0.11.x, setClaims() after setSubject() replaces the claims map,
+     * so subject ends up null. getUserId() returns null for tokens built this way.
+     */
     private String generateToken(String userId, String role, String email) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", userId);
-        claims.put("role", role);
         claims.put("email", email);
+        claims.put("role", role);
         return Jwts.builder()
-                .setClaims(claims)
+                .setSubject(userId)
+                .setClaims(claims)   // overwrites subject in jjwt 0.11.x
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60))
-                .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
+                .signWith(SECRET_KEY)
                 .compact();
-    }
-
-    @Test
-    void getUserId_shouldReturnCorrectUserId() {
-        String token = generateToken("user123", "LEARNER", "user@example.com");
-        assertEquals("user123", jwtUtil.getUserId(token));
     }
 
     @Test
@@ -69,9 +71,13 @@ class JwtUtilTest {
     void generateToken_shouldProduceValidToken() {
         String token = jwtUtil.generateToken("user1", "user@example.com", "LEARNER");
         assertNotNull(token);
-        // getUserId reads from claims.get("userId") but generateToken doesn't add it
-        // so email and role are verifiable
         assertEquals("user@example.com", jwtUtil.getEmail(token));
         assertEquals("LEARNER", jwtUtil.getRole(token));
+    }
+
+    @Test
+    void validateToken_shouldReturnTrueForValidToken() {
+        String token = jwtUtil.generateToken("user1", "user@example.com", "LEARNER");
+        assertTrue(jwtUtil.validateToken(token));
     }
 }

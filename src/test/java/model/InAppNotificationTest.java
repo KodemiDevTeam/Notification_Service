@@ -1,7 +1,7 @@
 package model;
 
-import org.Notification.model.InAppNotification;
-import org.Notification.model.enums.NotificationType;
+import org.notification.model.InAppNotification;
+import org.notification.model.enums.NotificationType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,9 +29,10 @@ class InAppNotificationTest {
     }
 
     @Test
-    void isRead_shouldDefaultToNull() {
+    void isRead_shouldDefaultToFalse() {
         InAppNotification n = new InAppNotification();
-        assertNull(n.getIsRead());
+        // isRead defaults to Boolean.FALSE per model definition
+        assertFalse(n.getIsRead());
     }
 
     @Test
