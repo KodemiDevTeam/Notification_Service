@@ -102,6 +102,7 @@ public class Notification {
     private String redirectUrl;
 
     public String getMessage() {
-        return "";
+        // Returns description as the message content for channel compatibility
+        return description != null ? description : "";
     }
 }

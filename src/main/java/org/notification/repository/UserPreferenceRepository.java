@@ -1,45 +1,31 @@
 package org.notification.repository;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-
 import org.notification.model.UserPreference;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class UserPreferenceRepository {
 
-    @Autowired
-    private DynamoDBMapper dynamoDBMapper;
+    private final DynamoDBMapper dynamoDBMapper;
 
+    public UserPreferenceRepository(DynamoDBMapper dynamoDBMapper) {
+        this.dynamoDBMapper = dynamoDBMapper;
+    }
 
-    // ✅ SAVE
+    // SAVE
     public UserPreference save(UserPreference pref) {
-
         dynamoDBMapper.save(pref);
-
         return pref;
     }
 
-
-    // ✅ FIND BY USER ID (PRIMARY KEY)
-
+    // FIND BY USER ID (PRIMARY KEY)
     public UserPreference findByUserId(String userId) {
-
-        return dynamoDBMapper.load(
-                UserPreference.class,
-                userId);
+        return dynamoDBMapper.load(UserPreference.class, userId);
     }
 
-
-    // ✅ OPTIONAL METHOD (same as find)
-
+    // GET BY USER ID
     public UserPreference getByUserId(String userId) {
-
-        return dynamoDBMapper.load(
-                UserPreference.class,
-                userId);
+        return dynamoDBMapper.load(UserPreference.class, userId);
     }
-
 }

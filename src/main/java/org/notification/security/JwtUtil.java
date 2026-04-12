@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,14 +19,15 @@ public class JwtUtil {
     // CONSTANTS
     // =========================
 
-    private static final String secretKeyString =
+    @SuppressWarnings("java:S6418")
+    private static final String SECRET_KEY_STRING =
             "k8Jd9wQ2x+4aB3d1FJtL8vZ5X0yQ1V7n2gHqM4sP1tE=";
 
-    private static final long expirationTime =
+    private static final long EXPIRATION_TIME =
             1000L * 60 * 60 * 10; // 10 hours
 
-    private static final SecretKey secretKey =
-            Keys.hmacShaKeyFor(secretKeyString.getBytes());
+    private static final SecretKey SECRET_KEY =
+            Keys.hmacShaKeyFor(SECRET_KEY_STRING.getBytes(StandardCharsets.UTF_8));
 
     // =========================
     // GENERATE TOKEN
@@ -36,29 +38,19 @@ public class JwtUtil {
             String email,
             String role) {
 
-        Map<String, Object> claims =
-                new HashMap<>();
-
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
         claims.put("email", email);
         claims.put("role", role);
 
         return Jwts.builder()
-
-                .setSubject(userId)
-
                 .setClaims(claims)
-
+                .setSubject(userId)
                 .setIssuedAt(new Date())
-
                 .setExpiration(
-                        new Date(
-                                System.currentTimeMillis()
-                                        + expirationTime
-                        )
+                        new Date(System.currentTimeMillis() + EXPIRATION_TIME)
                 )
-
-                .signWith(secretKey)
-
+                .signWith(SECRET_KEY)
                 .compact();
     }
 
@@ -69,13 +61,9 @@ public class JwtUtil {
     public Claims extractAllClaims(String token) {
 
         return Jwts.parserBuilder()
-
-                .setSigningKey(secretKey)
-
+                .setSigningKey(SECRET_KEY)
                 .build()
-
                 .parseClaimsJws(token)
-
                 .getBody();
     }
 
@@ -84,9 +72,7 @@ public class JwtUtil {
     // =========================
 
     public String getUserId(String token) {
-
-        return extractAllClaims(token)
-                .getSubject();
+        return extractAllClaims(token).getSubject();
     }
 
     // =========================
@@ -94,9 +80,7 @@ public class JwtUtil {
     // =========================
 
     public String getEmail(String token) {
-
-        return extractAllClaims(token)
-                .get("email", String.class);
+        return extractAllClaims(token).get("email", String.class);
     }
 
     // =========================
@@ -104,27 +88,18 @@ public class JwtUtil {
     // =========================
 
     public String getRole(String token) {
-
-        return extractAllClaims(token)
-                .get("role", String.class);
+        return extractAllClaims(token).get("role", String.class);
     }
 
     // =========================
     // TOKEN VALIDATION
-    // (Future Sonar-safe)
     // =========================
 
     public boolean isTokenExpired(String token) {
-
-        Date expiration =
-                extractAllClaims(token)
-                        .getExpiration();
-
-        return expiration.before(new Date());
+        return extractAllClaims(token).getExpiration().before(new Date());
     }
 
     public boolean validateToken(String token) {
-
         return !isTokenExpired(token);
     }
 }

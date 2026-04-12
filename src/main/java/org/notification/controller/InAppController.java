@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.notification.model.InAppNotification;
 import org.notification.repository.InAppRepository;
 import org.notification.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -15,13 +15,15 @@ import java.util.List;
 @RequestMapping("/api/inapps")
 public class InAppController {
 
-    @Autowired
-    private InAppRepository repo;
+    private final InAppRepository repo;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    public InAppController(InAppRepository repo, JwtUtil jwtUtil) {
+        this.repo = repo;
+        this.jwtUtil = jwtUtil;
+    }
 
-    // ✅ Get all notifications
+    // Get all notifications
     @GetMapping
     public List<InAppNotification> getNotifications(
             @RequestHeader("Authorization") String authHeader) {
@@ -32,14 +34,13 @@ public class InAppController {
         List<InAppNotification> list =
                 new ArrayList<>(repo.getByUserId(userId));
 
-        // sort latest first
         list.sort((a, b) ->
                 Long.compare(b.getCreatedAt(), a.getCreatedAt()));
 
         return list;
     }
 
-    // ✅ Mark as read (FIXED)
+    // Mark as read
     @PutMapping("/read/{id}")
     public String markAsRead(@PathVariable String id) {
 
@@ -48,50 +49,43 @@ public class InAppController {
                         .orElseThrow(() ->
                                 new RuntimeException("Notification not found"));
 
-        // ✅ Correct logic
         notif.setIsRead(true);
-
         repo.save(notif);
-
         return "Marked as read";
     }
 
-    // ✅ Get unread
+    // Get unread
     @GetMapping("/unread")
     public List<InAppNotification> getUnread(
             @RequestHeader("Authorization") String authHeader) {
 
         String token = authHeader.substring(7);
         String userId = jwtUtil.getUserId(token);
-
         return repo.getUnread(userId);
     }
 
-    // ✅ Get unread count
+    // Get unread count
     @GetMapping("/unread/count")
     public int getUnreadCount(
             @RequestHeader("Authorization") String authHeader) {
 
         String token = authHeader.substring(7);
         String userId = jwtUtil.getUserId(token);
-
         return repo.getUnread(userId).size();
     }
 
-    // ✅ Delete
+    // Delete
     @DeleteMapping("/{id}")
     public String deleteNotification(@PathVariable String id) {
-
         repo.deleteById(id);
-
         return "Notification deleted";
     }
 
-    // ✅ Get one
+    // Get one
     @GetMapping("/one/{id}")
-    public InAppNotification getOne(@PathVariable String id) {
-
+    public ResponseEntity<InAppNotification> getOne(@PathVariable String id) {
         return repo.findById(id)
-                .orElse(null);
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

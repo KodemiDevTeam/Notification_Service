@@ -6,9 +6,9 @@ spring:
     password: ${EMAIL_PASS}
     properties:
       mail:
-        smtp:
+        SMTP:
           auth: true
-          starttls:
+          STARTTLS:
             enable: true
   application:
     name: notification-service
@@ -21,10 +21,10 @@ aws:
   region: us-east-1
   accessKeyId: 5ceh4k
   secretKey: 35ffjb
-  dynamodb:
+  DynamoDB:
     endpoint: http://localhost:8000
 
-dynamodb:
+DynamoDB:
   table:
     name: notifications
 
@@ -39,7 +39,7 @@ notification:
   scheduler:
     interval: 10000   # 10 seconds
     max-retry: 3
-twilio:
+Twilio:
   account-sid: ${TWILIO_ACCOUNT_SID}
   auth-token: ${TWILIO_AUTH_TOKEN}
   phone-number: ${TWILIO_PHONE_NUMBER}

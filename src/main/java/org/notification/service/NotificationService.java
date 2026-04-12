@@ -25,9 +25,9 @@ public class NotificationService {
     // CONSTANTS
     // ==============================
 
-    private static final String STATUS_PENDING = "PENDING";
-    private static final String STATUS_SENT = "SENT";
-    private static final String STATUS_FAILED = "FAILED";
+    private static final String STATUS_PENDING = Notification.STATUS_PENDING;
+    private static final String STATUS_SENT = Notification.STATUS_SENT;
+    private static final String STATUS_FAILED = Notification.STATUS_FAILED;
 
     private static final String NOTIFICATION_NOT_FOUND =
             "Notification not found";
@@ -203,6 +203,7 @@ public class NotificationService {
 
                 break;
 
+            // All other notification types have no preference restriction
             default:
                 break;
         }

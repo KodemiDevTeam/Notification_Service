@@ -2,10 +2,6 @@ package org.notification.exception;
 
 public class InvalidUserIdException extends RuntimeException {
 
-    public InvalidUserIdException() {
-        super();
-    }
-
     public InvalidUserIdException(String message) {
         super(message);
     }

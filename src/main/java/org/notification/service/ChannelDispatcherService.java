@@ -19,7 +19,7 @@ public class ChannelDispatcherService {
     // CONSTANTS (Sonar-safe)
     // ==============================
 
-    private static final int maxRetry = 3;
+    private static final int MAX_RETRY = 3;
 
     private static final String STATUS_FAILED = "FAILED";
 
@@ -108,7 +108,7 @@ public class ChannelDispatcherService {
                         ? 0
                         : n.getRetryCount();
 
-        if (retry >= maxRetry) {
+        if (retry >= MAX_RETRY) {
 
             log.error(
                     "Max retries reached for {}",

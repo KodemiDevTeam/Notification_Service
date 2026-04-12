@@ -109,7 +109,7 @@ class InAppControllerTest {
         when(repo.findById("missing")).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/inapps/one/missing"))
-                .andExpect(status().isOk());
+                .andExpect(status().isNotFound());
     }
 
     private InAppNotification buildNotif(String id, String userId, long createdAt) {

@@ -11,20 +11,24 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableDynamoDBRepositories(basePackages = "org.Notification.repository")
+@EnableDynamoDBRepositories(basePackages = "org.notification.repository")
 public class DynamoDBConfig {
 
-    @Value("${aws.region:us-east-1}")
-    private String region;
+    private final String region;
+    private final String accessKey;
+    private final String secretKey;
+    private final String endpoint;
 
-    @Value("${aws.accessKeyId:local}")
-    private String accessKey;
-
-    @Value("${aws.secretKey:local}")
-    private String secretKey;
-
-    @Value("${aws.dynamodb.endpoint:}")
-    private String endpoint;
+    public DynamoDBConfig(
+            @Value("${aws.region:us-east-1}") String region,
+            @Value("${aws.accessKeyId:local}") String accessKey,
+            @Value("${aws.secretKey:local}") String secretKey,
+            @Value("${aws.dynamodb.endpoint:}") String endpoint) {
+        this.region = region;
+        this.accessKey = accessKey;
+        this.secretKey = secretKey;
+        this.endpoint = endpoint;
+    }
 
     @Bean
     public AmazonDynamoDB amazonDynamoDB() {
@@ -33,7 +37,6 @@ public class DynamoDBConfig {
                         new BasicAWSCredentials(accessKey, secretKey)));
 
         if (endpoint != null && !endpoint.isBlank()) {
-            // local DynamoDB / LocalStack
             builder.withEndpointConfiguration(
                     new AwsClientBuilder.EndpointConfiguration(endpoint, region));
         } else {

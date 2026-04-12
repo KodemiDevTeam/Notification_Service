@@ -14,11 +14,9 @@ import java.util.UUID;
 public class InAppChannel implements NotificationChannel {
 
     private static final String CHANNEL_NAME = "IN_APP";
-    private static final String STATUS_SENT = "SENT";
 
     private final InAppRepository repo;
 
-    // Constructor Injection
     public InAppChannel(InAppRepository repo) {
         this.repo = repo;
     }
@@ -41,23 +39,22 @@ public class InAppChannel implements NotificationChannel {
             );
         }
 
-        log.info("Received IN_APP notification for user {}",
-                n.getUserId());
+        log.info("Received IN_APP notification for user {}", n.getUserId());
 
         InAppNotification notif = new InAppNotification();
-
         notif.setId(UUID.randomUUID().toString());
         notif.setUserId(n.getUserId());
-        notif.setMessage(n.getMessage());
-        notif.setStatus(STATUS_SENT);
+        notif.setTitle(n.getTitle());
+        notif.setDescription(n.getDescription());
+        notif.setType(n.getType());
         notif.setCreatedAt(System.currentTimeMillis());
         notif.setIsRead(false);
+        notif.setRedirectUrl(n.getRedirectUrl());
 
         log.info("Saving notification to DynamoDB");
 
         repo.save(notif);
 
-        log.info("Notification saved successfully with id {}",
-                notif.getId());
+        log.info("Notification saved successfully with id {}", notif.getId());
     }
 }

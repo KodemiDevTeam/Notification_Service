@@ -3,7 +3,6 @@ package org.notification.repository;
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.notification.model.Notification;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.*;
@@ -11,32 +10,35 @@ import java.util.*;
 @Repository
 public class NotificationRepository {
 
-    @Autowired
-    private DynamoDBMapper dynamoDBMapper;
+    private final DynamoDBMapper dynamoDBMapper;
 
-    // ✅ SAVE
+    public NotificationRepository(DynamoDBMapper dynamoDBMapper) {
+        this.dynamoDBMapper = dynamoDBMapper;
+    }
+
+    // SAVE
     public Notification save(Notification notification) {
         dynamoDBMapper.save(notification);
         return notification;
     }
 
-    // ✅ GET BY ID
+    // GET BY ID
     public Notification getById(String id) {
         return dynamoDBMapper.load(Notification.class, id);
     }
 
-    // ✅ FIND BY ID (FIXED)
+    // FIND BY ID
     public Optional<Notification> findById(String id) {
         Notification notification = dynamoDBMapper.load(Notification.class, id);
         return Optional.ofNullable(notification);
     }
 
-    // ✅ FIND ALL
+    // FIND ALL
     public List<Notification> findAll() {
         return dynamoDBMapper.scan(Notification.class, new DynamoDBScanExpression());
     }
 
-    // ✅ FIND BY USER ID (GSI)
+    // FIND BY USER ID (GSI)
     public List<Notification> findByUserId(String userId) {
         Map<String, AttributeValue> values = new HashMap<>();
         values.put(":userId", new AttributeValue().withS(userId));
@@ -51,7 +53,7 @@ public class NotificationRepository {
         return dynamoDBMapper.query(Notification.class, query);
     }
 
-    // ✅ FIND BY STATUS (for scheduler)
+    // FIND BY STATUS (for scheduler)
     public List<Notification> findByStatus(String status) {
         Map<String, AttributeValue> values = new HashMap<>();
         values.put(":status", new AttributeValue().withS(status));
@@ -63,7 +65,7 @@ public class NotificationRepository {
         return dynamoDBMapper.scan(Notification.class, scanExpression);
     }
 
-    // ✅ DELETE
+    // DELETE
     public void delete(Notification notification) {
         dynamoDBMapper.delete(notification);
     }

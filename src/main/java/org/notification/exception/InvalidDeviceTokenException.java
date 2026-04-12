@@ -2,10 +2,6 @@ package org.notification.exception;
 
 public class InvalidDeviceTokenException extends RuntimeException {
 
-    public InvalidDeviceTokenException() {
-        super();
-    }
-
     public InvalidDeviceTokenException(String message) {
         super(message);
     }

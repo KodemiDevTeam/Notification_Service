@@ -20,9 +20,9 @@ public class NotificationScheduler {
     // CONSTANTS (Removes Magic Strings)
     // ==============================
 
-    private static final String STATUS_PENDING = "PENDING";
-    private static final String STATUS_SENT = "SENT";
-    private static final String STATUS_FAILED = "FAILED";
+    private static final String STATUS_PENDING = Notification.STATUS_PENDING;
+    private static final String STATUS_SENT = Notification.STATUS_SENT;
+    private static final String STATUS_FAILED = Notification.STATUS_FAILED;
 
     private final NotificationRepository repo;
     private final ChannelDispatcherService dispatcher;

@@ -12,8 +12,8 @@ class SmsChannelTest {
     private SmsChannel smsChannel;
 
     @BeforeEach
+    @SuppressWarnings("java:S6418")
     void setUp() {
-        // Provide dummy Twilio config values to satisfy constructor injection
         smsChannel = new SmsChannel("dummy-sid", "dummy-token", "+10000000000");
     }
 

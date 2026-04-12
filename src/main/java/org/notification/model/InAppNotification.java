@@ -68,10 +68,4 @@ public class InAppNotification {
 
     @DynamoDBAttribute(attributeName = "redirectUrl")
     private String redirectUrl;
-
-    public void setMessage(String message) {
-    }
-
-    public void setStatus(String statusSent) {
-    }
 }
