@@ -56,6 +56,20 @@ pipeline {
             }
         }
 
+        /* ================= TEST + COVERAGE ================= */
+
+        stage('Test & Coverage') {
+            steps {
+                sh '''
+                    echo "===== RUNNING TESTS WITH JACOCO ====="
+
+                    mvn -B test \
+                    -Deureka.client.enabled=false \
+                    -Dspring.cloud.discovery.enabled=false
+                '''
+            }
+        }
+
         /* ================= SONAR ================= */
 
         stage('SonarQube Analysis') {
