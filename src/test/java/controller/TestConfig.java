@@ -2,6 +2,6 @@ package controller;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication(scanBasePackages = "org.Notification")
+@SpringBootApplication(scanBasePackages = "org.notification")
 public class TestConfig {
 }

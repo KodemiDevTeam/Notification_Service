@@ -167,13 +167,19 @@
                         </goals>
                     </execution>
 
-                    <!-- Generate report -->
+                    <!-- Generate XML report for Sonar -->
                     <execution>
                         <id>report</id>
                         <phase>test</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <formats>
+                                <format>XML</format>
+                                <format>HTML</format>
+                            </formats>
+                        </configuration>
                     </execution>
 
                 </executions>

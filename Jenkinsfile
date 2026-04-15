@@ -82,7 +82,8 @@ pipeline {
                             mvn -B sonar:sonar \
                             -Dsonar.projectKey=$SONAR_PROJECT_KEY \
                             -Dsonar.projectName=$SONAR_PROJECT_NAME \
-                            -Dsonar.login=$SONAR_TOKEN
+                            -Dsonar.login=$SONAR_TOKEN \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                         '''
                     }
                 }
