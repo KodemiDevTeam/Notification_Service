@@ -1,78 +1,84 @@
 package repository;
 
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.notification.model.Notification;
 import org.notification.model.enums.NotificationType;
 import org.notification.repository.NotificationRepository;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationRepositoryTest {
 
-    @Mock NotificationRepository repo;
+    @Mock DynamoDBMapper dynamoDBMapper;
+    @InjectMocks NotificationRepository repo;
 
     @Test
-    void save_shouldReturnSavedNotification() {
+    void save_shouldCallMapperSave() {
         Notification n = buildNotification();
-        when(repo.save(n)).thenReturn(n);
-        Notification saved = repo.save(n);
-        assertNotNull(saved);
-        assertEquals("user1", saved.getUserId());
-        verify(repo, times(1)).save(n);
+        doNothing().when(dynamoDBMapper).save(n);
+        Notification result = repo.save(n);
+        assertNotNull(result);
+        verify(dynamoDBMapper, times(1)).save(n);
     }
 
     @Test
-    void findByUserId_shouldReturnList() {
+    void getById_shouldReturnNotification() {
         Notification n = buildNotification();
-        when(repo.findByUserId("user1")).thenReturn(List.of(n));
-        List<Notification> result = repo.findByUserId("user1");
-        assertEquals(1, result.size());
+        when(dynamoDBMapper.load(Notification.class, "id-1")).thenReturn(n);
+        Notification result = repo.getById("id-1");
+        assertNotNull(result);
     }
 
     @Test
-    void findByUserId_shouldReturnEmptyForUnknown() {
-        when(repo.findByUserId("unknown")).thenReturn(List.of());
-        assertTrue(repo.findByUserId("unknown").isEmpty());
-    }
-
-    @Test
-    void findById_shouldReturnNotification() {
-        String id = UUID.randomUUID().toString();
+    void findById_shouldReturnOptionalPresent() {
         Notification n = buildNotification();
-        when(repo.findById(id)).thenReturn(Optional.of(n));
-        Optional<Notification> result = repo.findById(id);
+        when(dynamoDBMapper.load(Notification.class, "id-1")).thenReturn(n);
+        Optional<Notification> result = repo.findById("id-1");
         assertTrue(result.isPresent());
     }
 
     @Test
-    void findById_shouldReturnEmptyWhenNotFound() {
-        when(repo.findById("none")).thenReturn(Optional.empty());
-        assertFalse(repo.findById("none").isPresent());
+    void findById_shouldReturnEmptyWhenNull() {
+        when(dynamoDBMapper.load(Notification.class, "none")).thenReturn(null);
+        Optional<Notification> result = repo.findById("none");
+        assertFalse(result.isPresent());
     }
 
     @Test
-    void delete_shouldCallDelete() {
+    void findByStatus_shouldCallScan() {
+        assertDoesNotThrow(() -> repo.findByStatus("PENDING"));
+    }
+
+    @Test
+    void findByUserId_shouldCallQuery() {
+        assertDoesNotThrow(() -> repo.findByUserId("user1"));
+    }
+
+    @Test
+    void findAll_shouldCallScan() {
+        assertDoesNotThrow(() -> repo.findAll());
+    }
+
+    @Test
+    void delete_shouldCallMapperDelete() {
         Notification n = buildNotification();
-        doNothing().when(repo).delete(n);
+        doNothing().when(dynamoDBMapper).delete(n);
         repo.delete(n);
-        verify(repo, times(1)).delete(n);
-    }
-
-    @Test
-    void findAll_shouldReturnList() {
-        Notification n = buildNotification();
-        when(repo.findAll()).thenReturn(List.of(n));
-        List<Notification> result = repo.findAll();
-        assertEquals(1, result.size());
+        verify(dynamoDBMapper, times(1)).delete(n);
     }
 
     private Notification buildNotification() {

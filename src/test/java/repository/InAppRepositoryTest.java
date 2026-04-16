@@ -1,90 +1,104 @@
 package repository;
 
-import org.notification.model.InAppNotification;
-import org.notification.repository.InAppRepository;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.notification.model.InAppNotification;
+import org.notification.repository.InAppRepository;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InAppRepositoryTest {
 
-    @Mock InAppRepository repo;
+    @Mock DynamoDBMapper dynamoDBMapper;
+    @InjectMocks InAppRepository repo;
 
     @Test
-    void save_shouldCallSave() {
+    void save_shouldCallMapperSave() {
         InAppNotification n = buildNotif("user1");
-        doNothing().when(repo).save(n);
+        doNothing().when(dynamoDBMapper).save(n);
         repo.save(n);
-        verify(repo, times(1)).save(n);
+        verify(dynamoDBMapper, times(1)).save(n);
     }
 
     @Test
-    void getByUserId_shouldReturnList() {
+    void save_shouldThrowWhenNull() {
+        assertThrows(IllegalArgumentException.class, () -> repo.save(null));
+    }
+
+    @Test
+    void findById_shouldReturnPresent() {
         InAppNotification n = buildNotif("user1");
-        when(repo.getByUserId("user1")).thenReturn(List.of(n));
-        List<InAppNotification> result = repo.getByUserId("user1");
-        assertEquals(1, result.size());
-        assertEquals("user1", result.get(0).getUserId());
+        when(dynamoDBMapper.load(InAppNotification.class, "id-1")).thenReturn(n);
+        Optional<InAppNotification> result = repo.findById("id-1");
+        assertTrue(result.isPresent());
     }
 
     @Test
-    void getByUserId_shouldReturnEmptyForUnknown() {
-        when(repo.getByUserId("unknown")).thenReturn(List.of());
-        assertTrue(repo.getByUserId("unknown").isEmpty());
+    void findById_shouldReturnEmptyWhenNull() {
+        when(dynamoDBMapper.load(InAppNotification.class, "none")).thenReturn(null);
+        Optional<InAppNotification> result = repo.findById("none");
+        assertFalse(result.isPresent());
     }
 
     @Test
-    void getUnread_shouldReturnUnreadNotifications() {
+    void findById_shouldReturnEmptyForBlankId() {
+        Optional<InAppNotification> result = repo.findById("");
+        assertFalse(result.isPresent());
+    }
+
+    @Test
+    void findById_shouldReturnEmptyForNullId() {
+        Optional<InAppNotification> result = repo.findById(null);
+        assertFalse(result.isPresent());
+    }
+
+    @Test
+    void getByUserId_shouldReturnEmptyForBlankUserId() {
+        List<InAppNotification> result = repo.getByUserId("");
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getByUserId_shouldReturnEmptyForNullUserId() {
+        List<InAppNotification> result = repo.getByUserId(null);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void delete_shouldCallMapperDelete() {
         InAppNotification n = buildNotif("user1");
-        when(repo.getUnread("user1")).thenReturn(List.of(n));
-        List<InAppNotification> result = repo.getUnread("user1");
-        assertEquals(1, result.size());
-        assertFalse(result.get(0).getIsRead());
+        doNothing().when(dynamoDBMapper).delete(n);
+        repo.delete(n);
+        verify(dynamoDBMapper, times(1)).delete(n);
     }
 
     @Test
-    void getUnread_shouldReturnEmptyWhenAllRead() {
-        when(repo.getUnread("user1")).thenReturn(List.of());
-        assertTrue(repo.getUnread("user1").isEmpty());
-    }
-
-    @Test
-    void findById_shouldReturnNotification() {
-        String id = UUID.randomUUID().toString();
-        InAppNotification n = buildNotif("user1");
-        n.setId(id);
-        when(repo.findById(id)).thenReturn(Optional.of(n));
-        assertTrue(repo.findById(id).isPresent());
-    }
-
-    @Test
-    void findById_shouldReturnEmptyWhenNotFound() {
-        when(repo.findById("none")).thenReturn(Optional.empty());
-        assertFalse(repo.findById("none").isPresent());
+    void delete_shouldNotThrowForNull() {
+        assertDoesNotThrow(() -> repo.delete(null));
     }
 
     @Test
     void deleteById_shouldCallDelete() {
-        doNothing().when(repo).deleteById("id-1");
-        repo.deleteById("id-1");
-        verify(repo, times(1)).deleteById("id-1");
-    }
-
-    @Test
-    void delete_shouldCallDelete() {
         InAppNotification n = buildNotif("user1");
-        doNothing().when(repo).delete(n);
-        repo.delete(n);
-        verify(repo, times(1)).delete(n);
+        when(dynamoDBMapper.load(InAppNotification.class, "id-1")).thenReturn(n);
+        doNothing().when(dynamoDBMapper).delete(n);
+        repo.deleteById("id-1");
+        verify(dynamoDBMapper, times(1)).delete(n);
     }
 
     private InAppNotification buildNotif(String userId) {
