@@ -1,44 +1,78 @@
 package model;
 
+import org.junit.jupiter.api.Test;
 import org.notification.model.InAppNotification;
 import org.notification.model.enums.NotificationType;
-import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class InAppNotificationTest {
 
     @Test
-    void settersAndGetters_shouldWorkCorrectly() {
+    void defaultValues_shouldBeSetCorrectly() {
+        InAppNotification n = new InAppNotification();
+        assertFalse(n.getIsRead());
+    }
+
+    @Test
+    void constants_shouldHaveCorrectValues() {
+        assertEquals("inapp_notifications", InAppNotification.TABLE_NAME);
+        assertEquals("userId-index", InAppNotification.USER_ID_INDEX);
+    }
+
+    @Test
+    void settersAndGetters_allFields() {
         InAppNotification n = new InAppNotification();
         n.setId("id-1");
         n.setUserId("user1");
-        n.setTitle("Test");
+        n.setTitle("Title");
         n.setDescription("Desc");
-        n.setType(NotificationType.COURSE_ALERT);
-        n.setIsRead(false);
+        n.setType(NotificationType.STREAK_ALERT);
+        n.setIsRead(true);
         n.setCreatedAt(1000L);
+        n.setRedirectUrl("https://example.com");
 
         assertEquals("id-1", n.getId());
         assertEquals("user1", n.getUserId());
-        assertEquals("Test", n.getTitle());
+        assertEquals("Title", n.getTitle());
         assertEquals("Desc", n.getDescription());
-        assertEquals(NotificationType.COURSE_ALERT, n.getType());
-        assertFalse(n.getIsRead());
+        assertEquals(NotificationType.STREAK_ALERT, n.getType());
+        assertTrue(n.getIsRead());
         assertEquals(1000L, n.getCreatedAt());
+        assertEquals("https://example.com", n.getRedirectUrl());
     }
 
     @Test
-    void isRead_shouldDefaultToFalse() {
+    void setIsRead_shouldUpdateValue() {
         InAppNotification n = new InAppNotification();
-        // isRead defaults to Boolean.FALSE per model definition
         assertFalse(n.getIsRead());
-    }
-
-    @Test
-    void setIsRead_shouldUpdateToTrue() {
-        InAppNotification n = new InAppNotification();
         n.setIsRead(true);
         assertTrue(n.getIsRead());
+        n.setIsRead(false);
+        assertFalse(n.getIsRead());
+    }
+
+    @Test
+    void equalsAndHashCode_shouldWorkForSameObject() {
+        InAppNotification n = new InAppNotification();
+        n.setId("id-1");
+        assertEquals(n, n);
+        assertEquals(n.hashCode(), n.hashCode());
+    }
+
+    @Test
+    void toString_shouldNotBeNull() {
+        InAppNotification n = new InAppNotification();
+        n.setId("id-1");
+        assertNotNull(n.toString());
+    }
+
+    @Test
+    void allNotificationTypes_shouldBeSettable() {
+        InAppNotification n = new InAppNotification();
+        for (NotificationType type : NotificationType.values()) {
+            n.setType(type);
+            assertEquals(type, n.getType());
+        }
     }
 }
