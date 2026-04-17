@@ -56,6 +56,14 @@ class ExceptionTest {
     }
 
     @Test
+    void invalidEmailException_shouldHaveMessageAndCause() {
+        RuntimeException cause = new RuntimeException("cause");
+        InvalidEmailException ex = new InvalidEmailException("bad email", cause);
+        assertEquals("bad email", ex.getMessage());
+        assertEquals(cause, ex.getCause());
+    }
+
+    @Test
     void invalidPhoneNumberException_shouldHaveMessage() {
         InvalidPhoneNumberException ex = new InvalidPhoneNumberException("bad phone");
         assertEquals("bad phone", ex.getMessage());
@@ -68,6 +76,14 @@ class ExceptionTest {
     }
 
     @Test
+    void invalidDeviceTokenException_shouldHaveMessageAndCause() {
+        RuntimeException cause = new RuntimeException("cause");
+        InvalidDeviceTokenException ex = new InvalidDeviceTokenException("bad token", cause);
+        assertEquals("bad token", ex.getMessage());
+        assertEquals(cause, ex.getCause());
+    }
+
+    @Test
     void invalidMessageException_shouldHaveMessage() {
         InvalidMessageException ex = new InvalidMessageException("bad message");
         assertEquals("bad message", ex.getMessage());
@@ -77,5 +93,13 @@ class ExceptionTest {
     void invalidUserIdException_shouldHaveMessage() {
         InvalidUserIdException ex = new InvalidUserIdException("bad userId");
         assertEquals("bad userId", ex.getMessage());
+    }
+
+    @Test
+    void invalidUserIdException_shouldHaveMessageAndCause() {
+        RuntimeException cause = new RuntimeException("cause");
+        InvalidUserIdException ex = new InvalidUserIdException("bad userId", cause);
+        assertEquals("bad userId", ex.getMessage());
+        assertEquals(cause, ex.getCause());
     }
 }

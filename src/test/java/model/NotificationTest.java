@@ -79,19 +79,63 @@ class NotificationTest {
     }
 
     @Test
-    void equalsAndHashCode_shouldWorkForSameObject() {
-        Notification n = new Notification();
-        n.setNotificationId("id-1");
-        n.setUserId("user1");
+    void equals_shouldReturnTrueForSameObject() {
+        Notification n = buildFull();
         assertEquals(n, n);
-        assertEquals(n.hashCode(), n.hashCode());
+    }
+
+    @Test
+    void equals_shouldReturnTrueForEqualObjects() {
+        Notification n1 = buildFull();
+        Notification n2 = buildFull();
+        assertEquals(n1, n2);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForDifferentId() {
+        Notification n1 = buildFull();
+        Notification n2 = buildFull();
+        n2.setNotificationId("different");
+        assertNotEquals(n1, n2);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForNull() {
+        Notification n = buildFull();
+        assertNotEquals(n, null);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForDifferentClass() {
+        Notification n = buildFull();
+        assertNotEquals(n, "string");
+    }
+
+    @Test
+    void hashCode_shouldBeEqualForEqualObjects() {
+        Notification n1 = buildFull();
+        Notification n2 = buildFull();
+        assertEquals(n1.hashCode(), n2.hashCode());
+    }
+
+    @Test
+    void hashCode_shouldDifferForDifferentObjects() {
+        Notification n1 = buildFull();
+        Notification n2 = buildFull();
+        n2.setNotificationId("different");
+        assertNotEquals(n1.hashCode(), n2.hashCode());
     }
 
     @Test
     void toString_shouldNotBeNull() {
-        Notification n = new Notification();
-        n.setNotificationId("id-1");
-        assertNotNull(n.toString());
+        assertNotNull(buildFull().toString());
+    }
+
+    @Test
+    void equals_withNullFields() {
+        Notification n1 = new Notification();
+        Notification n2 = new Notification();
+        assertEquals(n1, n2);
     }
 
     @Test
@@ -101,5 +145,26 @@ class NotificationTest {
             n.setType(type);
             assertEquals(type, n.getType());
         }
+    }
+
+    private Notification buildFull() {
+        Notification n = new Notification();
+        n.setNotificationId("id-1");
+        n.setUserId("user1");
+        n.setTitle("Title");
+        n.setDescription("Desc");
+        n.setType(NotificationType.COURSE_ALERT);
+        n.setChannel("EMAIL");
+        n.setEmail("a@b.com");
+        n.setPhoneNumber("+91999");
+        n.setDeviceToken("token");
+        n.setIsRead(false);
+        n.setIsScheduled(false);
+        n.setScheduledTime(1000L);
+        n.setCreatedAt(2000L);
+        n.setStatus("PENDING");
+        n.setRetryCount(0);
+        n.setRedirectUrl("https://example.com");
+        return n;
     }
 }

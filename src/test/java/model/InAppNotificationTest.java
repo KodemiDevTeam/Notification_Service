@@ -43,28 +43,59 @@ class InAppNotificationTest {
     }
 
     @Test
-    void setIsRead_shouldUpdateValue() {
-        InAppNotification n = new InAppNotification();
-        assertFalse(n.getIsRead());
-        n.setIsRead(true);
-        assertTrue(n.getIsRead());
-        n.setIsRead(false);
-        assertFalse(n.getIsRead());
+    void equals_shouldReturnTrueForSameObject() {
+        InAppNotification n = buildFull();
+        assertEquals(n, n);
     }
 
     @Test
-    void equalsAndHashCode_shouldWorkForSameObject() {
-        InAppNotification n = new InAppNotification();
-        n.setId("id-1");
-        assertEquals(n, n);
-        assertEquals(n.hashCode(), n.hashCode());
+    void equals_shouldReturnTrueForEqualObjects() {
+        InAppNotification n1 = buildFull();
+        InAppNotification n2 = buildFull();
+        assertEquals(n1, n2);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForDifferentId() {
+        InAppNotification n1 = buildFull();
+        InAppNotification n2 = buildFull();
+        n2.setId("different");
+        assertNotEquals(n1, n2);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForNull() {
+        assertNotEquals(buildFull(), null);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForDifferentClass() {
+        assertNotEquals(buildFull(), "string");
+    }
+
+    @Test
+    void equals_withNullFields() {
+        InAppNotification n1 = new InAppNotification();
+        InAppNotification n2 = new InAppNotification();
+        assertEquals(n1, n2);
+    }
+
+    @Test
+    void hashCode_shouldBeEqualForEqualObjects() {
+        assertEquals(buildFull().hashCode(), buildFull().hashCode());
+    }
+
+    @Test
+    void hashCode_shouldDifferForDifferentObjects() {
+        InAppNotification n1 = buildFull();
+        InAppNotification n2 = buildFull();
+        n2.setId("different");
+        assertNotEquals(n1.hashCode(), n2.hashCode());
     }
 
     @Test
     void toString_shouldNotBeNull() {
-        InAppNotification n = new InAppNotification();
-        n.setId("id-1");
-        assertNotNull(n.toString());
+        assertNotNull(buildFull().toString());
     }
 
     @Test
@@ -74,5 +105,18 @@ class InAppNotificationTest {
             n.setType(type);
             assertEquals(type, n.getType());
         }
+    }
+
+    private InAppNotification buildFull() {
+        InAppNotification n = new InAppNotification();
+        n.setId("id-1");
+        n.setUserId("user1");
+        n.setTitle("Title");
+        n.setDescription("Desc");
+        n.setType(NotificationType.COURSE_ALERT);
+        n.setIsRead(false);
+        n.setCreatedAt(1000L);
+        n.setRedirectUrl("https://example.com");
+        return n;
     }
 }

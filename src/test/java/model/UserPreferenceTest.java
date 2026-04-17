@@ -37,39 +37,67 @@ class UserPreferenceTest {
     }
 
     @Test
-    void equalsAndHashCode_shouldWorkForSameObject() {
-        UserPreference pref = new UserPreference();
-        pref.setUserId("user1");
-        assertEquals(pref, pref);
-        assertEquals(pref.hashCode(), pref.hashCode());
+    void equals_shouldReturnTrueForSameObject() {
+        UserPreference p = buildFull();
+        assertEquals(p, p);
+    }
+
+    @Test
+    void equals_shouldReturnTrueForEqualObjects() {
+        assertEquals(buildFull(), buildFull());
+    }
+
+    @Test
+    void equals_shouldReturnFalseForDifferentUserId() {
+        UserPreference p1 = buildFull();
+        UserPreference p2 = buildFull();
+        p2.setUserId("different");
+        assertNotEquals(p1, p2);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForNull() {
+        assertNotEquals(buildFull(), null);
+    }
+
+    @Test
+    void equals_shouldReturnFalseForDifferentClass() {
+        assertNotEquals(buildFull(), "string");
+    }
+
+    @Test
+    void equals_withNullFields() {
+        UserPreference p1 = new UserPreference();
+        UserPreference p2 = new UserPreference();
+        assertEquals(p1, p2);
+    }
+
+    @Test
+    void hashCode_shouldBeEqualForEqualObjects() {
+        assertEquals(buildFull().hashCode(), buildFull().hashCode());
+    }
+
+    @Test
+    void hashCode_shouldDifferForDifferentObjects() {
+        UserPreference p1 = buildFull();
+        UserPreference p2 = buildFull();
+        p2.setUserId("different");
+        assertNotEquals(p1.hashCode(), p2.hashCode());
     }
 
     @Test
     void toString_shouldNotBeNull() {
-        UserPreference pref = new UserPreference();
-        pref.setUserId("user1");
-        assertNotNull(pref.toString());
+        assertNotNull(buildFull().toString());
     }
 
-    @Test
-    void allPreferences_canBeToggled() {
+    private UserPreference buildFull() {
         UserPreference pref = new UserPreference();
-
+        pref.setUserId("user1");
         pref.setStudentFeedback(true);
-        assertTrue(pref.getStudentFeedback());
-        pref.setStudentFeedback(false);
-        assertFalse(pref.getStudentFeedback());
-
         pref.setLiveClassReminder(true);
-        assertTrue(pref.getLiveClassReminder());
-
-        pref.setPayoutUpdate(true);
-        assertTrue(pref.getPayoutUpdate());
-
+        pref.setPayoutUpdate(false);
         pref.setStreakUpdate(true);
-        assertTrue(pref.getStreakUpdate());
-
-        pref.setNewEnrollment(true);
-        assertTrue(pref.getNewEnrollment());
+        pref.setNewEnrollment(false);
+        return pref;
     }
 }
