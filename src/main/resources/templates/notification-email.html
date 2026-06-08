@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .header {
+            background-color: #4a90e2;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            letter-spacing: 1px;
+        }
+        .content {
+            padding: 40px 30px;
+            color: #333333;
+            line-height: 1.6;
+        }
+        .content h2 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .message-body {
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #4a90e2;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #999999;
+            border-top: 1px solid #eeeeee;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Kodemi Updates</h1>
+        </div>
+        
+        <div class="content">
+            <h2 th:text="${title}">Notification Title</h2>
+            
+            <div class="message-body" th:text="${message}">
+                This is the fallback notification message if template data is missing.
+            </div>
+
+            <div class="button-container" th:if="${redirectUrl != null and !redirectUrl.isEmpty()}">
+                <a th:href="${redirectUrl}" class="cta-button">View Details</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2026 Kodemi. All rights reserved.</p>
+            <p>You are receiving this because of your notification preferences.</p>
+        </div>
+    </div>
+</body>
+</html>

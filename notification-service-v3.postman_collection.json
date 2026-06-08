@@ -1,0 +1,200 @@
+{
+	"info": {
+		"_postman_id": "c1f7b889-4e78-4a5f-9e8a-e9b2a75d5b7a",
+		"name": "Notification Service V3 - Production Ready",
+		"description": "Comprehensive Postman collection for the production-ready Notification Service V3. Features strict deduplication, atomic database locking, and advanced scheduling capabilities.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/notifications/health",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"notifications",
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Broadcast - All Channels (Deduplicated)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Major Platform Update!\",\n    \"message\": \"We just launched the new features. Log in to explore!\",\n    \"type\": \"SYSTEM_ALERT\",\n    \"priority\": \"HIGH\",\n    \"channels\": [\"EMAIL\", \"SMS\", \"IN_APP\"],\n    \"targetRole\": \"LEARNER\",\n    \"sendMode\": \"SEND_NOW\",\n    \"maxRetries\": 3\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/notifications/broadcast",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"notifications",
+						"broadcast"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Broadcast - Daily Morning Scheduler",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Daily Learning Streak\",\n    \"message\": \"Good morning! Don't forget to complete your lesson for today.\",\n    \"type\": \"PROMOTIONAL\",\n    \"priority\": \"NORMAL\",\n    \"channels\": [\"IN_APP\"],\n    \"targetRole\": \"LEARNER\",\n    \"sendMode\": \"DAILY_MORNING\",\n    \"morningTime\": \"09:00\",\n    \"timezone\": \"Asia/Kolkata\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/notifications/broadcast",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"notifications",
+						"broadcast"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Send Direct (Immediate)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"userId\": \"{{userId}}\",\n    \"title\": \"Direct Message\",\n    \"message\": \"This is a direct message.\",\n    \"type\": \"GENERAL\",\n    \"channel\": \"IN_APP\",\n    \"priority\": \"NORMAL\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/notifications/in-app",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"notifications",
+						"in-app"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get User Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/notifications/user/{{userId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"notifications",
+						"user",
+						"{{userId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cancel Broadcast Batch",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/notifications/broadcast/{{batchId}}/cancel",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"notifications",
+						"broadcast",
+						"{{batchId}}",
+						"cancel"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080"
+		},
+		{
+			"key": "token",
+			"value": "your_jwt_token_here"
+		},
+		{
+			"key": "userId",
+			"value": "sample_user_id"
+		},
+		{
+			"key": "batchId",
+			"value": "sample_batch_id"
+		}
+	]
+}

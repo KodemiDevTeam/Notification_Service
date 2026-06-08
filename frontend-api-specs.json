@@ -1,0 +1,129 @@
+{
+  "service": "Notification Service V3",
+  "version": "1.0.0",
+  "baseUrl": "http://localhost:8080/api/v1/notifications",
+  "authentication": "Bearer Token required in Authorization header for all requests except health check.",
+  "endpoints": {
+    "healthCheck": {
+      "method": "GET",
+      "path": "/health",
+      "description": "Check if the notification service is up and running.",
+      "requestBody": null,
+      "responseExample": {
+        "status": "UP"
+      }
+    },
+    "broadcast": {
+      "method": "POST",
+      "path": "/broadcast",
+      "description": "Send a broadcast notification to a specific role. Deduplicates users and supports scheduling.",
+      "requestBody": {
+        "title": "String (Required) - e.g., 'Platform Update'",
+        "message": "String (Required) - e.g., 'New features are live!'",
+        "type": "Enum (Required) - [GENERAL, TRANSACTIONAL, SYSTEM_ALERT, PROMOTIONAL, COURSE_UPDATE, LIVE_CLASS, PAYMENT, ENROLLMENT]",
+        "priority": "Enum (Required) - [LOW, NORMAL, HIGH, CRITICAL]",
+        "channels": "Array of Enums (Required) - ['IN_APP', 'EMAIL', 'SMS']",
+        "targetRole": "String (Required) - e.g., 'LEARNER', 'TRAINER', 'ADMIN'",
+        "sendMode": "Enum (Required) - [SEND_NOW, SCHEDULED, DAILY_MORNING, DAILY_EVENING, DAILY_MORNING_EVENING]",
+        "scheduledTime": "Long (Optional) - UNIX timestamp in ms (Required if sendMode is SCHEDULED)",
+        "morningTime": "String (Optional) - e.g., '09:00' (Used for DAILY_MORNING)",
+        "eveningTime": "String (Optional) - e.g., '18:00' (Used for DAILY_EVENING)",
+        "timezone": "String (Optional) - e.g., 'Asia/Kolkata'",
+        "maxRetries": "Integer (Optional) - Default 3"
+      },
+      "responseExample": {
+        "batchId": "uuid-string",
+        "totalUsers": 500,
+        "emailCreated": 500,
+        "smsCreated": 450,
+        "inAppCreated": 500,
+        "totalNotificationsCreated": 1450
+      }
+    },
+    "sendDirectInApp": {
+      "method": "POST",
+      "path": "/in-app",
+      "description": "Send an immediate In-App notification directly to a single user.",
+      "requestBody": {
+        "userId": "String (Required)",
+        "title": "String (Required)",
+        "message": "String (Required)",
+        "type": "Enum (Required)",
+        "priority": "Enum (Required)"
+      }
+    },
+    "sendDirectEmail": {
+      "method": "POST",
+      "path": "/email",
+      "description": "Send an immediate Email directly to a single user.",
+      "requestBody": {
+        "userId": "String (Required)",
+        "email": "String (Required) - User's email address",
+        "title": "String (Required)",
+        "message": "String (Required)",
+        "type": "Enum (Required)",
+        "priority": "Enum (Required)"
+      }
+    },
+    "sendDirectSms": {
+      "method": "POST",
+      "path": "/sms",
+      "description": "Send an immediate SMS directly to a single user.",
+      "requestBody": {
+        "userId": "String (Required)",
+        "phoneNumber": "String (Required) - E.164 format e.g. +919000000000",
+        "title": "String (Required)",
+        "message": "String (Required)",
+        "type": "Enum (Required)",
+        "priority": "Enum (Required)"
+      }
+    },
+    "scheduleDirectNotification": {
+      "method": "POST",
+      "path": "/schedule",
+      "description": "Schedule a direct notification for a specific user at a specific future time.",
+      "requestBody": {
+        "userId": "String (Required)",
+        "channel": "Enum (Required) - [IN_APP, EMAIL, SMS]",
+        "email": "String (Optional) - Required if channel is EMAIL",
+        "phoneNumber": "String (Optional) - Required if channel is SMS",
+        "title": "String (Required)",
+        "message": "String (Required)",
+        "type": "Enum (Required)",
+        "priority": "Enum (Required)",
+        "scheduledTime": "Long (Required) - UNIX timestamp in milliseconds"
+      }
+    },
+    "fetchUserNotifications": {
+      "method": "GET",
+      "path": "/user/{userId}",
+      "description": "Fetch all notifications for a given user.",
+      "requestBody": null,
+      "responseExample": [
+        {
+          "notificationId": "uuid-string",
+          "userId": "12345",
+          "title": "Alert",
+          "message": "Your class starts soon.",
+          "type": "LIVE_CLASS",
+          "channel": "IN_APP",
+          "status": "SENT",
+          "isRead": false,
+          "createdAt": 1720000000000
+        }
+      ]
+    },
+    "markAsRead": {
+      "method": "PATCH",
+      "path": "/{notificationId}/read",
+      "description": "Mark a specific notification as read.",
+      "requestBody": null
+    },
+    "markAllAsRead": {
+      "method": "PATCH",
+      "path": "/user/{userId}/read-all",
+      "description": "Mark all notifications for a specific user as read.",
+      "requestBody": null
+    }
+  }
+}

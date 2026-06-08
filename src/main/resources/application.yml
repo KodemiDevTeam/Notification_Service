@@ -1,51 +1,77 @@
+server:
+  port: 8087
+
 spring:
+  application:
+    name: notification-service
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 5000
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${EMAIL_USER:dummy@gmail.com}
-    password: ${EMAIL_PASS:dummy}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
+          ssl:
+            trust: smtp.gmail.com
           auth: true
           starttls:
             enable: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
-  application:
-    name: notification-service
-  task:
-    scheduling:
-      pool:
-        size: 5
 
 aws:
-  region: us-east-1
-  accessKeyId: 5ceh4k
-  secretKey: 35ffjb
-  dynamodb:
-    endpoint: http://localhost:8000
+  region: ${AWS_REGION:eu-north-1}
 
-dynamodb:
-  table:
-    name: notifications
 
-logging:
-  level:
-    root: INFO
-    service: DEBUG
-    repository: DEBUG
-
-jwt:
-  secret: ${JWT_SECRET:k8Jd9wQ2x+4aB3d1FJtL8vZ5X0yQ1V7n2gHqM4sP1tE=}
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  phone-number: ${TWILIO_PHONE_NUMBER:}
 
 notification:
   scheduler:
-    interval: 10000
-    max-retry: 3
+    enabled: true
+    fixed-delay-ms: 60000
+    batch-size: 50
+  recurring:
+    timezone: Asia/Kolkata
+    morning-time: "09:00"
+    evening-time: "18:00"
+  retry:
+    max-retries: 3
 
-twilio:
-  account-sid: ${TWILIO_ACCOUNT_SID:dummy_sid}
-  auth-token: ${TWILIO_AUTH_TOKEN:dummy_token}
-  phone-number: ${TWILIO_PHONE_NUMBER:+10000000000}
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+    instances:
+      user-service:
+        baseConfig: default
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+    instances:
+      user-service:
+        baseConfig: default
+
+
