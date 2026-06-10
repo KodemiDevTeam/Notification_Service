@@ -233,6 +233,9 @@ class NotificationSchedulerTest {
 
         verify(dynamoDBMapper, never()).save(any());
     }
+
+    @Test
+    void testProcessPendingNotifications_Sorting() {
         Notification n1 = new Notification();
         n1.setNotificationId("n1");
         n1.setStatus(NotificationStatus.PENDING);
