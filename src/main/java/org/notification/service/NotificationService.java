@@ -27,7 +27,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
@@ -56,129 +55,132 @@ public class NotificationService {
 
     public BroadcastNotificationResponse broadcast(BroadcastNotificationRequest req) {
         log.info("Starting broadcast for role: {}, sendMode: {}", req.getTargetRole(), req.getSendMode());
-        List<UserNotificationTargetDTO> rawTargets = userClient.getUsersForNotification(req.getTargetRole());
-        
-        // Deduplicate targets by userId to prevent identical user objects from spamming
-        List<UserNotificationTargetDTO> targets = new java.util.ArrayList<>();
-        if (rawTargets != null) {
-            java.util.Map<String, UserNotificationTargetDTO> targetMap = new java.util.LinkedHashMap<>();
-            for (UserNotificationTargetDTO t : rawTargets) {
-                if (t.getUserId() != null && !targetMap.containsKey(t.getUserId())) {
-                    targetMap.put(t.getUserId(), t);
-                }
-            }
-            targets.addAll(targetMap.values());
-        }
+        List<UserNotificationTargetDTO> targets = deduplicateTargets(userClient.getUsersForNotification(req.getTargetRole()));
 
-        int totalUsers = targets.size();
-        int inAppCreated = 0, emailCreated = 0, smsCreated = 0;
-        int skippedEmailMissing = 0, skippedPhoneMissing = 0;
+        BroadcastCounts counts = new BroadcastCounts();
         String batchId = UUID.randomUUID().toString();
 
-        // Track emails and phones sent in this batch to prevent duplicates
-        java.util.Set<String> processedEmails = new java.util.HashSet<>();
-        java.util.Set<String> processedPhones = new java.util.HashSet<>();
-
-        if (!targets.isEmpty()) {
+        if (!targets.isEmpty() && req.getChannels() != null) {
+            java.util.Set<String> processedEmails = new java.util.HashSet<>();
+            java.util.Set<String> processedPhones = new java.util.HashSet<>();
             for (UserNotificationTargetDTO target : targets) {
-                if (req.getChannels() == null) continue;
-
-                for (NotificationChannel channel : req.getChannels()) {
-                    try {
-                        String email = target.getEmail() != null ? target.getEmail().trim().toLowerCase() : null;
-                        String phone = target.getPhoneNumber() != null ? target.getPhoneNumber().trim() : null;
-
-                        if (channel == NotificationChannel.EMAIL) {
-                            if (email == null || email.isBlank()) {
-                                skippedEmailMissing++;
-                                continue;
-                            }
-                            if (!processedEmails.add(email)) {
-                                continue; // Already sent an email to this address in this broadcast
-                            }
-                        }
-
-                        if (channel == NotificationChannel.SMS) {
-                            if (phone == null || phone.isBlank()) {
-                                skippedPhoneMissing++;
-                                continue;
-                            }
-                            if (!processedPhones.add(phone)) {
-                                continue; // Already sent an SMS to this phone in this broadcast
-                            }
-                        }
-
-                        int created = createRecordsForMode(batchId, target.getUserId(), email, phone, channel, req);
-                        
-                        if (created > 0) {
-                            if (channel == NotificationChannel.IN_APP) inAppCreated += created;
-                            if (channel == NotificationChannel.EMAIL) emailCreated += created;
-                            if (channel == NotificationChannel.SMS) smsCreated += created;
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to create broadcast records for user {} channel {}", target.getUserId(), channel, e);
-                    }
-                }
+                processTarget(batchId, target, req, counts, processedEmails, processedPhones);
             }
         }
 
         return BroadcastNotificationResponse.builder()
                 .batchId(batchId)
-                .totalUsers(totalUsers)
-                .inAppCreated(inAppCreated)
-                .emailCreated(emailCreated)
-                .smsCreated(smsCreated)
-                .totalNotificationsCreated(inAppCreated + emailCreated + smsCreated)
-                .skippedEmailMissing(skippedEmailMissing)
-                .skippedPhoneMissing(skippedPhoneMissing)
+                .totalUsers(targets.size())
+                .inAppCreated(counts.inApp)
+                .emailCreated(counts.email)
+                .smsCreated(counts.sms)
+                .totalNotificationsCreated(counts.inApp + counts.email + counts.sms)
+                .skippedEmailMissing(counts.skippedEmail)
+                .skippedPhoneMissing(counts.skippedPhone)
                 .message("Broadcast enqueued successfully.")
                 .build();
     }
 
-    private int createRecordsForMode(String batchId, String userId, String email, String phone, NotificationChannel channel, BroadcastNotificationRequest req) {
+    private static List<UserNotificationTargetDTO> deduplicateTargets(List<UserNotificationTargetDTO> raw) {
+        if (raw == null) return new java.util.ArrayList<>();
+        java.util.Map<String, UserNotificationTargetDTO> map = new java.util.LinkedHashMap<>();
+        for (UserNotificationTargetDTO t : raw) {
+            if (t.getUserId() != null) map.putIfAbsent(t.getUserId(), t);
+        }
+        return new java.util.ArrayList<>(map.values());
+    }
+
+    private void processTarget(String batchId, UserNotificationTargetDTO target,
+                               BroadcastNotificationRequest req, BroadcastCounts counts,
+                               java.util.Set<String> processedEmails, java.util.Set<String> processedPhones) {
+        for (NotificationChannel channel : req.getChannels()) {
+            try {
+                String email = target.getEmail() != null ? target.getEmail().trim().toLowerCase() : null;
+                String phone = target.getPhoneNumber() != null ? target.getPhoneNumber().trim() : null;
+
+                if (!canSendOnChannel(channel, email, phone, counts, processedEmails, processedPhones)) continue;
+
+                int created = createRecordsForMode(batchId, target.getUserId(), email, phone, channel, req);
+                counts.add(channel, created);
+            } catch (Exception e) {
+                log.error("Failed to create broadcast records for user {} channel {}", target.getUserId(), channel, e);
+            }
+        }
+    }
+
+    private static boolean canSendOnChannel(NotificationChannel channel, String email, String phone,
+                                            BroadcastCounts counts,
+                                            java.util.Set<String> processedEmails,
+                                            java.util.Set<String> processedPhones) {
+        if (channel == NotificationChannel.EMAIL) {
+            if (email == null || email.isBlank()) { counts.skippedEmail++; return false; }
+            return processedEmails.add(email);
+        }
+        if (channel == NotificationChannel.SMS) {
+            if (phone == null || phone.isBlank()) { counts.skippedPhone++; return false; }
+            return processedPhones.add(phone);
+        }
+        return true;
+    }
+
+    /** Mutable accumulator for broadcast counters — keeps broadcast() under the complexity limit. */
+    private static final class BroadcastCounts {
+        int inApp;
+        int email;
+        int sms;
+        int skippedEmail;
+        int skippedPhone;
+
+        void add(NotificationChannel channel, int n) {
+            if (channel == NotificationChannel.IN_APP) inApp += n;
+            else if (channel == NotificationChannel.EMAIL) email += n;
+            else if (channel == NotificationChannel.SMS) sms += n;
+        }
+    }
+
+    private int createRecordsForMode(String batchId, String userId, String email, String phone,
+                                     NotificationChannel channel, BroadcastNotificationRequest req) {
         long now = System.currentTimeMillis();
-        int created = 0;
         String tz = req.getTimezone() != null ? req.getTimezone() : defaultTimezone;
         ZoneId zoneId = ZoneId.of(tz);
         LocalDate today = LocalDate.now(zoneId);
 
-        if (req.getSendMode() == SendMode.SEND_NOW) {
-            saveRecord(batchId, userId, email, phone, channel, req, now, null, null, null);
-            created++;
-        } else if (req.getSendMode() == SendMode.SCHEDULED) {
-            long scheduledAtEpoch = now;
-            if (req.getScheduledAt() != null && !req.getScheduledAt().isBlank()) {
-                try {
-                    LocalDateTime ldt = LocalDateTime.parse(req.getScheduledAt());
-                    scheduledAtEpoch = ldt.atZone(zoneId).toInstant().toEpochMilli();
-                } catch (Exception e) {
-                    log.error("Failed to parse scheduledAt: {}", req.getScheduledAt());
-                }
-            }
-            saveRecord(batchId, userId, email, phone, channel, req, scheduledAtEpoch, null, null, null);
-            created++;
-        } else if (req.getSendMode() == SendMode.DAILY_MORNING) {
-            created += tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId);
-        } else if (req.getSendMode() == SendMode.DAILY_EVENING) {
-            created += tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId);
-        } else if (req.getSendMode() == SendMode.DAILY_MORNING_EVENING) {
-            created += tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId);
-            created += tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId);
-        } else if (req.getSendMode() == SendMode.CUSTOM_RECURRING) {
-            long scheduledAtEpoch = now;
-            if (req.getScheduledAt() != null && !req.getScheduledAt().isBlank()) {
-                try {
-                    LocalDateTime ldt = LocalDateTime.parse(req.getScheduledAt());
-                    scheduledAtEpoch = ldt.atZone(zoneId).toInstant().toEpochMilli();
-                } catch (Exception e) {
-                    log.error("Failed to parse scheduledAt: {}", req.getScheduledAt());
-                }
-            }
-            saveRecord(batchId, userId, email, phone, channel, req, scheduledAtEpoch, null, null, null);
-            created++;
+        switch (req.getSendMode()) {
+            case SEND_NOW:
+                saveRecord(batchId, userId, email, phone, channel, req, now, null, null, null);
+                return 1;
+            case SCHEDULED:
+                saveRecord(batchId, userId, email, phone, channel, req,
+                        parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null);
+                return 1;
+            case DAILY_MORNING:
+                return tryCreateRecurring(batchId, userId, email, phone, channel, req,
+                        today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId);
+            case DAILY_EVENING:
+                return tryCreateRecurring(batchId, userId, email, phone, channel, req,
+                        today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId);
+            case DAILY_MORNING_EVENING:
+                return tryCreateRecurring(batchId, userId, email, phone, channel, req,
+                        today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId)
+                     + tryCreateRecurring(batchId, userId, email, phone, channel, req,
+                        today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId);
+            case CUSTOM_RECURRING:
+                saveRecord(batchId, userId, email, phone, channel, req,
+                        parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null);
+                return 1;
+            default:
+                return 0;
         }
+    }
 
-        return created;
+    private long parseEpoch(String scheduledAt, long fallback, ZoneId zoneId) {
+        if (scheduledAt == null || scheduledAt.isBlank()) return fallback;
+        try {
+            return LocalDateTime.parse(scheduledAt).atZone(zoneId).toInstant().toEpochMilli();
+        } catch (Exception e) {
+            log.error("Failed to parse scheduledAt: {}", scheduledAt);
+            return fallback;
+        }
     }
 
     private int tryCreateRecurring(String batchId, String userId, String email, String phone, NotificationChannel channel,
@@ -263,10 +265,18 @@ public class NotificationService {
         return n;
     }
 
-    /** Carries all parameters needed to construct a Notification, avoiding long method signatures. */
     private static final class NotificationParams {
-        final String userId, email, phone, title, message, redirectUrl, referenceId, batchId;
-        final String recurrenceKey, recurrenceDate, recurrenceSlot;
+        final String userId;
+        final String email;
+        final String phone;
+        final String title;
+        final String message;
+        final String redirectUrl;
+        final String referenceId;
+        final String batchId;
+        final String recurrenceKey;
+        final String recurrenceDate;
+        final String recurrenceSlot;
         final org.notification.model.enums.NotificationType type;
         final NotificationChannel channel;
         final org.notification.model.enums.NotificationPriority priority;
@@ -275,22 +285,39 @@ public class NotificationService {
         final Integer maxRetries;
 
         private NotificationParams(Builder b) {
-            this.userId = b.userId; this.email = b.email; this.phone = b.phone;
-            this.title = b.title; this.message = b.message;
-            this.redirectUrl = b.redirectUrl; this.referenceId = b.referenceId;
+            this.userId = b.userId;
+            this.email = b.email;
+            this.phone = b.phone;
+            this.title = b.title;
+            this.message = b.message;
+            this.redirectUrl = b.redirectUrl;
+            this.referenceId = b.referenceId;
             this.batchId = b.batchId;
-            this.recurrenceKey = b.recurrenceKey; this.recurrenceDate = b.recurrenceDate;
+            this.recurrenceKey = b.recurrenceKey;
+            this.recurrenceDate = b.recurrenceDate;
             this.recurrenceSlot = b.recurrenceSlot;
-            this.type = b.type; this.channel = b.channel;
-            this.priority = b.priority; this.sendMode = b.sendMode;
-            this.scheduledAt = b.scheduledAt; this.maxRetries = b.maxRetries;
+            this.type = b.type;
+            this.channel = b.channel;
+            this.priority = b.priority;
+            this.sendMode = b.sendMode;
+            this.scheduledAt = b.scheduledAt;
+            this.maxRetries = b.maxRetries;
         }
 
         static Builder builder() { return new Builder(); }
 
         static final class Builder {
-            String userId, email, phone, title, message, redirectUrl, referenceId, batchId;
-            String recurrenceKey, recurrenceDate, recurrenceSlot;
+            String userId;
+            String email;
+            String phone;
+            String title;
+            String message;
+            String redirectUrl;
+            String referenceId;
+            String batchId;
+            String recurrenceKey;
+            String recurrenceDate;
+            String recurrenceSlot;
             org.notification.model.enums.NotificationType type;
             NotificationChannel channel;
             org.notification.model.enums.NotificationPriority priority;

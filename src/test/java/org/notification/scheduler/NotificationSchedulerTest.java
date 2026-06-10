@@ -169,7 +169,70 @@ class NotificationSchedulerTest {
     }
 
     @Test
-    void testProcessPendingNotifications_Sorting() {
+    void testProcessPendingNotifications_ProviderDisabled_MarksSkipped() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+        n.setSendMode(SendMode.SEND_NOW);
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+        when(repository.acquireLock("n1", NotificationStatus.PENDING, NotificationStatus.PROCESSING)).thenReturn(true);
+
+        doThrow(new org.notification.exception.ProviderDisabledException("EMAIL_PROVIDER_DISABLED"))
+                .when(dispatcher).dispatch(n);
+
+        scheduler.processPendingNotifications();
+
+        verify(repository, times(1)).save(n);
+        assertEquals(NotificationStatus.SKIPPED, n.getStatus());
+    }
+
+    @Test
+    void testProcessPendingNotifications_LockException_Skips() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+        when(repository.acquireLock(anyString(), any(), any())).thenThrow(new RuntimeException("DynamoDB error"));
+
+        scheduler.processPendingNotifications();
+
+        verify(dispatcher, never()).dispatch(any());
+    }
+
+    @Test
+    void testProcessPendingNotifications_EmptyList_DoesNothing() {
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of());
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+
+        scheduler.processPendingNotifications();
+
+        verify(dispatcher, never()).dispatch(any());
+    }
+
+    @Test
+    void testScheduleNextRecurrence_AlreadyExists_DoesNotSave() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+        n.setSendMode(SendMode.DAILY_EVENING);
+        n.setScheduledAt(1716435000000L);
+        n.setBatchId("batch1");
+        n.setUserId("user1");
+        n.setChannel(org.notification.model.enums.NotificationChannel.IN_APP);
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+        when(repository.acquireLock("n1", NotificationStatus.PENDING, NotificationStatus.PROCESSING)).thenReturn(true);
+        when(repository.existsByRecurrenceKey(anyString())).thenReturn(true);
+
+        scheduler.processPendingNotifications();
+
+        verify(dynamoDBMapper, never()).save(any());
+    }
         Notification n1 = new Notification();
         n1.setNotificationId("n1");
         n1.setStatus(NotificationStatus.PENDING);

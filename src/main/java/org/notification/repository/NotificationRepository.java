@@ -1,10 +1,15 @@
 package org.notification.repository;
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBSaveExpression;
+import com.amazonaws.services.dynamodbv2.model.AttributeAction;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
-import com.amazonaws.services.dynamodbv2.model.ComparisonOperator;
-import com.amazonaws.services.dynamodbv2.model.Condition;
+import com.amazonaws.services.dynamodbv2.model.AttributeValueUpdate;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue;
+import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import org.notification.model.Notification;
 import org.notification.model.enums.NotificationStatus;
 import org.springframework.stereotype.Repository;
@@ -17,10 +22,12 @@ import java.util.Map;
 @Repository
 public class NotificationRepository {
 
-    private final DynamoDBMapper dynamoDBMapper;
-    private final com.amazonaws.services.dynamodbv2.AmazonDynamoDB amazonDynamoDB;
+    private static final String STATUS = "status";
 
-    public NotificationRepository(DynamoDBMapper dynamoDBMapper, com.amazonaws.services.dynamodbv2.AmazonDynamoDB amazonDynamoDB) {
+    private final DynamoDBMapper dynamoDBMapper;
+    private final AmazonDynamoDB amazonDynamoDB;
+
+    public NotificationRepository(DynamoDBMapper dynamoDBMapper, AmazonDynamoDB amazonDynamoDB) {
         this.dynamoDBMapper = dynamoDBMapper;
         this.amazonDynamoDB = amazonDynamoDB;
     }
@@ -32,14 +39,13 @@ public class NotificationRepository {
 
     public boolean saveIdempotent(Notification notification) {
         try {
-            com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBSaveExpression saveExpression = new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBSaveExpression();
-            Map<String, com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue> expected = new HashMap<>();
-            expected.put("notificationId", new com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue().withExists(false));
+            DynamoDBSaveExpression saveExpression = new DynamoDBSaveExpression();
+            Map<String, ExpectedAttributeValue> expected = new HashMap<>();
+            expected.put("notificationId", new ExpectedAttributeValue().withExists(false));
             saveExpression.setExpected(expected);
-            
             dynamoDBMapper.save(notification, saveExpression);
             return true;
-        } catch (com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException e) {
+        } catch (ConditionalCheckFailedException e) {
             return false;
         }
     }
@@ -57,7 +63,7 @@ public class NotificationRepository {
                 .withConsistentRead(false)
                 .withKeyConditionExpression("userId = :userId")
                 .withExpressionAttributeValues(values)
-                .withScanIndexForward(false); // Newest first based on createdAt
+                .withScanIndexForward(false);
 
         return dynamoDBMapper.query(Notification.class, query);
     }
@@ -71,7 +77,7 @@ public class NotificationRepository {
                 .withIndexName(Notification.STATUS_SCHEDULED_INDEX)
                 .withConsistentRead(false)
                 .withKeyConditionExpression("#st = :status and scheduledAt <= :now")
-                .withExpressionAttributeNames(Collections.singletonMap("#st", "status"))
+                .withExpressionAttributeNames(Collections.singletonMap("#st", STATUS))
                 .withExpressionAttributeValues(values)
                 .withLimit(limit);
 
@@ -89,8 +95,7 @@ public class NotificationRepository {
                 .withExpressionAttributeValues(values)
                 .withLimit(1);
 
-        List<Notification> results = dynamoDBMapper.queryPage(Notification.class, query).getResults();
-        return !results.isEmpty();
+        return !dynamoDBMapper.queryPage(Notification.class, query).getResults().isEmpty();
     }
 
     public List<Notification> findByBatchId(String batchId) {
@@ -111,20 +116,20 @@ public class NotificationRepository {
             Map<String, AttributeValue> key = new HashMap<>();
             key.put("notificationId", new AttributeValue().withS(notificationId));
 
-            Map<String, com.amazonaws.services.dynamodbv2.model.AttributeValueUpdate> updates = new HashMap<>();
-            updates.put("status", new com.amazonaws.services.dynamodbv2.model.AttributeValueUpdate()
-                    .withAction(com.amazonaws.services.dynamodbv2.model.AttributeAction.PUT)
+            Map<String, AttributeValueUpdate> updates = new HashMap<>();
+            updates.put(STATUS, new AttributeValueUpdate()
+                    .withAction(AttributeAction.PUT)
                     .withValue(new AttributeValue().withS(newStatus.name())));
-            updates.put("updatedAt", new com.amazonaws.services.dynamodbv2.model.AttributeValueUpdate()
-                    .withAction(com.amazonaws.services.dynamodbv2.model.AttributeAction.PUT)
+            updates.put("updatedAt", new AttributeValueUpdate()
+                    .withAction(AttributeAction.PUT)
                     .withValue(new AttributeValue().withN(String.valueOf(System.currentTimeMillis()))));
 
-            Map<String, com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue> expected = new HashMap<>();
-            expected.put("status", new com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue()
+            Map<String, ExpectedAttributeValue> expected = new HashMap<>();
+            expected.put(STATUS, new ExpectedAttributeValue()
                     .withComparisonOperator(com.amazonaws.services.dynamodbv2.model.ComparisonOperator.EQ)
                     .withValue(new AttributeValue().withS(currentStatus.name())));
 
-            com.amazonaws.services.dynamodbv2.model.UpdateItemRequest request = new com.amazonaws.services.dynamodbv2.model.UpdateItemRequest()
+            UpdateItemRequest request = new UpdateItemRequest()
                     .withTableName(Notification.TABLE_NAME)
                     .withKey(key)
                     .withAttributeUpdates(updates)
@@ -132,7 +137,7 @@ public class NotificationRepository {
 
             amazonDynamoDB.updateItem(request);
             return true;
-        } catch (com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException e) {
+        } catch (ConditionalCheckFailedException e) {
             return false;
         }
     }

@@ -3,6 +3,9 @@ package org.notification.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.notification.exception.EmailSendingException;
@@ -31,24 +34,12 @@ class EmailSenderServiceTest {
         verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
     }
 
-    @Test
-    void testSendEmail_NullRecipient_ThrowsIllegalArgument() {
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void testSendEmail_InvalidRecipient_ThrowsIllegalArgument(String recipient) {
         assertThrows(IllegalArgumentException.class,
-                () -> emailSenderService.sendEmail(null, "Subject", "Body"));
-        verifyNoInteractions(mailSender);
-    }
-
-    @Test
-    void testSendEmail_BlankRecipient_ThrowsIllegalArgument() {
-        assertThrows(IllegalArgumentException.class,
-                () -> emailSenderService.sendEmail("   ", "Subject", "Body"));
-        verifyNoInteractions(mailSender);
-    }
-
-    @Test
-    void testSendEmail_EmptyRecipient_ThrowsIllegalArgument() {
-        assertThrows(IllegalArgumentException.class,
-                () -> emailSenderService.sendEmail("", "Subject", "Body"));
+                () -> emailSenderService.sendEmail(recipient, "Subject", "Body"));
         verifyNoInteractions(mailSender);
     }
 
