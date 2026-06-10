@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.notification.config.ProviderConfigValidator;
 import org.notification.model.Notification;
 import org.notification.model.enums.NotificationChannel;
 
@@ -65,14 +67,14 @@ class NotificationDispatcherTest {
 
     @Test
     void testDispatchEmail_ProviderDisabled() {
-        org.notification.config.ProviderConfigValidator.isEmailEnabled = false;
-        try {
+        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
+            mocked.when(ProviderConfigValidator::isEmailEnabled).thenReturn(false);
+            mocked.when(ProviderConfigValidator::isSmsEnabled).thenReturn(true);
+
             Notification n = new Notification();
             n.setChannel(NotificationChannel.EMAIL);
-            
+
             assertThrows(org.notification.exception.ProviderDisabledException.class, () -> dispatcher.dispatch(n));
-        } finally {
-            org.notification.config.ProviderConfigValidator.isEmailEnabled = true;
         }
     }
 
@@ -113,14 +115,14 @@ class NotificationDispatcherTest {
 
     @Test
     void testDispatchSms_ProviderDisabled() {
-        org.notification.config.ProviderConfigValidator.isSmsEnabled = false;
-        try {
+        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
+            mocked.when(ProviderConfigValidator::isEmailEnabled).thenReturn(true);
+            mocked.when(ProviderConfigValidator::isSmsEnabled).thenReturn(false);
+
             Notification n = new Notification();
             n.setChannel(NotificationChannel.SMS);
-            
+
             assertThrows(org.notification.exception.ProviderDisabledException.class, () -> dispatcher.dispatch(n));
-        } finally {
-            org.notification.config.ProviderConfigValidator.isSmsEnabled = true;
         }
     }
 

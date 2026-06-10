@@ -14,19 +14,22 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final String ERROR = "error";
+    private static final String MESSAGE = "message";
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleResourceNotFoundException(ResourceNotFoundException ex) {
         Map<String, String> response = new HashMap<>();
-        response.put("error", "Not Found");
-        response.put("message", "The requested DynamoDB resource does not exist.");
+        response.put(ERROR, "Not Found");
+        response.put(MESSAGE, "The requested DynamoDB resource does not exist.");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
         Map<String, String> response = new HashMap<>();
-        response.put("error", "Bad Request");
-        response.put("message", ex.getMessage());
+        response.put(ERROR, "Bad Request");
+        response.put(MESSAGE, ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -50,16 +53,16 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<Map<String, String>> handleDownstreamFailures(Exception ex) {
         Map<String, String> response = new HashMap<>();
-        response.put("error", "Service Unavailable");
-        response.put("message", "Downstream service call failed: " + ex.getMessage());
+        response.put(ERROR, "Service Unavailable");
+        response.put(MESSAGE, "Downstream service call failed: " + ex.getMessage());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneralException(Exception ex) {
         Map<String, String> response = new HashMap<>();
-        response.put("error", "Internal Server Error");
-        response.put("message", ex.getMessage());
+        response.put(ERROR, "Internal Server Error");
+        response.put(MESSAGE, ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

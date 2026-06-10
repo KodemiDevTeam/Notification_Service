@@ -199,62 +199,124 @@ public class NotificationService {
         return 1;
     }
 
-    private void saveRecord(String batchId, String userId, String email, String phone, NotificationChannel channel,
-                            BroadcastNotificationRequest req, long scheduledAt, String recurrenceKey, String recurrenceDate, String recurrenceSlot) {
-        Notification n = buildNotification(userId, email, phone, req.getTitle(), req.getMessage(), req.getType(), channel, req.getRedirectUrl(), req.getReferenceId(), req.getPriority(), batchId, req.getSendMode(), scheduledAt, req.getMaxRetries(), recurrenceKey, recurrenceDate, recurrenceSlot);
-        if (!repository.saveIdempotent(n)) {
+    private void saveRecord(String batchId, String userId, String email, String phone,
+                            NotificationChannel channel, BroadcastNotificationRequest req,
+                            long scheduledAt, String recurrenceKey, String recurrenceDate, String recurrenceSlot) {
+        NotificationParams params = NotificationParams.builder()
+                .userId(userId).email(email).phone(phone)
+                .title(req.getTitle()).message(req.getMessage())
+                .type(req.getType()).channel(channel)
+                .redirectUrl(req.getRedirectUrl()).referenceId(req.getReferenceId())
+                .priority(req.getPriority()).batchId(batchId)
+                .sendMode(req.getSendMode()).scheduledAt(scheduledAt)
+                .maxRetries(req.getMaxRetries())
+                .recurrenceKey(recurrenceKey).recurrenceDate(recurrenceDate).recurrenceSlot(recurrenceSlot)
+                .build();
+        if (!repository.saveIdempotent(buildNotification(params))) {
             log.info("Duplicate broadcast notification skipped for user {} channel {}", userId, channel);
         }
     }
 
-    private Notification buildNotification(String userId, String email, String phone, String title, String message, 
-                                           org.notification.model.enums.NotificationType type, 
-                                           org.notification.model.enums.NotificationChannel channel, 
-                                           String redirectUrl, String referenceId, 
-                                           org.notification.model.enums.NotificationPriority priority, 
-                                           String batchId, org.notification.model.enums.SendMode sendMode, long scheduledAt,
-                                           Integer maxRetries, String recurrenceKey, String recurrenceDate, String recurrenceSlot) {
+    private Notification buildNotification(NotificationParams p) {
         Notification n = new Notification();
-        n.setUserId(userId);
-        n.setRecipientEmail(email);
-        n.setRecipientPhone(phone);
-        n.setTitle(title);
-        n.setMessage(message);
-        n.setType(type);
-        n.setChannel(channel);
-        n.setRedirectUrl(redirectUrl);
-        n.setReferenceId(referenceId);
-        n.setBatchId(batchId);
-        
-        String idempotencyKey = type.name() + "_" + userId + "_" + (referenceId != null ? referenceId : "NONE") + "_" + channel.name();
-        if (recurrenceKey != null) {
-            idempotencyKey += "_" + recurrenceKey;
-        } else if (batchId != null) {
-            idempotencyKey += "_" + batchId;
+        n.setUserId(p.userId);
+        n.setRecipientEmail(p.email);
+        n.setRecipientPhone(p.phone);
+        n.setTitle(p.title);
+        n.setMessage(p.message);
+        n.setType(p.type);
+        n.setChannel(p.channel);
+        n.setRedirectUrl(p.redirectUrl);
+        n.setReferenceId(p.referenceId);
+        n.setBatchId(p.batchId);
+
+        String idempotencyKey = p.type.name() + "_" + p.userId
+                + "_" + (p.referenceId != null ? p.referenceId : "NONE")
+                + "_" + p.channel.name();
+        if (p.recurrenceKey != null) {
+            idempotencyKey += "_" + p.recurrenceKey;
+        } else if (p.batchId != null) {
+            idempotencyKey += "_" + p.batchId;
         }
         n.setIdempotencyKey(idempotencyKey);
         n.setNotificationId(UUID.nameUUIDFromBytes(idempotencyKey.getBytes(StandardCharsets.UTF_8)).toString());
-        
+
         n.setStatus(NotificationStatus.PENDING);
-        n.setSendMode(sendMode);
-        n.setPriority(priority != null ? priority : org.notification.model.enums.NotificationPriority.NORMAL);
-        n.setScheduledAt(scheduledAt);
-        
+        n.setSendMode(p.sendMode);
+        n.setPriority(p.priority != null ? p.priority : org.notification.model.enums.NotificationPriority.NORMAL);
+        n.setScheduledAt(p.scheduledAt);
+
         long now = System.currentTimeMillis();
         n.setCreatedAt(now);
         n.setUpdatedAt(now);
-        n.setExpirationTime((now / 1000) + (30L * 24 * 60 * 60)); // +30 days TTL in seconds
-        
-        n.setMaxRetries(maxRetries != null ? maxRetries : defaultMaxRetries);
+        n.setExpirationTime((now / 1000) + (30L * 24 * 60 * 60));
+
+        n.setMaxRetries(p.maxRetries != null ? p.maxRetries : defaultMaxRetries);
         n.setRetryCount(0);
-        
-        if (recurrenceKey != null) {
-            n.setRecurrenceKey(recurrenceKey);
-            n.setRecurrenceDate(recurrenceDate);
-            n.setRecurrenceSlot(recurrenceSlot);
+
+        if (p.recurrenceKey != null) {
+            n.setRecurrenceKey(p.recurrenceKey);
+            n.setRecurrenceDate(p.recurrenceDate);
+            n.setRecurrenceSlot(p.recurrenceSlot);
         }
-        
+
         return n;
+    }
+
+    /** Carries all parameters needed to construct a Notification, avoiding long method signatures. */
+    private static final class NotificationParams {
+        final String userId, email, phone, title, message, redirectUrl, referenceId, batchId;
+        final String recurrenceKey, recurrenceDate, recurrenceSlot;
+        final org.notification.model.enums.NotificationType type;
+        final NotificationChannel channel;
+        final org.notification.model.enums.NotificationPriority priority;
+        final org.notification.model.enums.SendMode sendMode;
+        final long scheduledAt;
+        final Integer maxRetries;
+
+        private NotificationParams(Builder b) {
+            this.userId = b.userId; this.email = b.email; this.phone = b.phone;
+            this.title = b.title; this.message = b.message;
+            this.redirectUrl = b.redirectUrl; this.referenceId = b.referenceId;
+            this.batchId = b.batchId;
+            this.recurrenceKey = b.recurrenceKey; this.recurrenceDate = b.recurrenceDate;
+            this.recurrenceSlot = b.recurrenceSlot;
+            this.type = b.type; this.channel = b.channel;
+            this.priority = b.priority; this.sendMode = b.sendMode;
+            this.scheduledAt = b.scheduledAt; this.maxRetries = b.maxRetries;
+        }
+
+        static Builder builder() { return new Builder(); }
+
+        static final class Builder {
+            String userId, email, phone, title, message, redirectUrl, referenceId, batchId;
+            String recurrenceKey, recurrenceDate, recurrenceSlot;
+            org.notification.model.enums.NotificationType type;
+            NotificationChannel channel;
+            org.notification.model.enums.NotificationPriority priority;
+            org.notification.model.enums.SendMode sendMode;
+            long scheduledAt;
+            Integer maxRetries;
+
+            Builder userId(String v) { this.userId = v; return this; }
+            Builder email(String v) { this.email = v; return this; }
+            Builder phone(String v) { this.phone = v; return this; }
+            Builder title(String v) { this.title = v; return this; }
+            Builder message(String v) { this.message = v; return this; }
+            Builder redirectUrl(String v) { this.redirectUrl = v; return this; }
+            Builder referenceId(String v) { this.referenceId = v; return this; }
+            Builder batchId(String v) { this.batchId = v; return this; }
+            Builder recurrenceKey(String v) { this.recurrenceKey = v; return this; }
+            Builder recurrenceDate(String v) { this.recurrenceDate = v; return this; }
+            Builder recurrenceSlot(String v) { this.recurrenceSlot = v; return this; }
+            Builder type(org.notification.model.enums.NotificationType v) { this.type = v; return this; }
+            Builder channel(NotificationChannel v) { this.channel = v; return this; }
+            Builder priority(org.notification.model.enums.NotificationPriority v) { this.priority = v; return this; }
+            Builder sendMode(org.notification.model.enums.SendMode v) { this.sendMode = v; return this; }
+            Builder scheduledAt(long v) { this.scheduledAt = v; return this; }
+            Builder maxRetries(Integer v) { this.maxRetries = v; return this; }
+            NotificationParams build() { return new NotificationParams(this); }
+        }
     }
 
     public void cancelBatch(String batchId) {
@@ -297,8 +359,15 @@ public class NotificationService {
             @CacheEvict(value = "unreadCount", key = "#req.userId")
     })
     public void sendImmediate(NotificationRequest req) {
-        Notification n = buildNotification(req.getUserId(), req.getEmail(), req.getPhoneNumber(), req.getTitle(), req.getMessage(), req.getType(), req.getChannel(), req.getRedirectUrl(), req.getReferenceId(), req.getPriority(), null, SendMode.SEND_NOW, System.currentTimeMillis(), defaultMaxRetries, null, null, null);
-        if (!repository.saveIdempotent(n)) {
+        NotificationParams params = NotificationParams.builder()
+                .userId(req.getUserId()).email(req.getEmail()).phone(req.getPhoneNumber())
+                .title(req.getTitle()).message(req.getMessage())
+                .type(req.getType()).channel(req.getChannel())
+                .redirectUrl(req.getRedirectUrl()).referenceId(req.getReferenceId())
+                .priority(req.getPriority()).sendMode(SendMode.SEND_NOW)
+                .scheduledAt(System.currentTimeMillis()).maxRetries(defaultMaxRetries)
+                .build();
+        if (!repository.saveIdempotent(buildNotification(params))) {
             log.info("Duplicate immediate notification skipped for user {} channel {}", req.getUserId(), req.getChannel());
         }
     }
@@ -345,34 +414,28 @@ public class NotificationService {
         for (String cStr : req.getChannels()) {
             try {
                 NotificationChannel channel = NotificationChannel.valueOf(cStr);
-                boolean skip = false;
-                
-                if (channel == NotificationChannel.EMAIL) {
-                    if (req.getEmail() == null || req.getEmail().isBlank()) {
-                        log.warn("Skipping EMAIL for user {} due to missing email address.", req.getUserId());
-                        skip = true;
-                    }
-                } else if (channel == NotificationChannel.SMS) {
-                    if (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank()) {
-                        log.warn("Skipping SMS for user {} due to missing phone number.", req.getUserId());
-                        skip = true;
-                    }
+
+                if (channel == NotificationChannel.EMAIL && (req.getEmail() == null || req.getEmail().isBlank())) {
+                    log.warn("Skipping EMAIL for user {} due to missing email address.", req.getUserId());
+                    continue;
+                }
+                if (channel == NotificationChannel.SMS && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
+                    log.warn("Skipping SMS for user {} due to missing phone number.", req.getUserId());
+                    continue;
                 }
 
-                if (!skip) {
-                    Notification n = buildNotification(req.getUserId(), req.getEmail(), req.getPhoneNumber(), req.getTitle(), req.getMessage(), req.getType(), channel, req.getRedirectUrl(), req.getReferenceId(), req.getPriority(), null, SendMode.SEND_NOW, System.currentTimeMillis(), defaultMaxRetries, null, null, null);
-                    
-                    if (repository.saveIdempotent(n)) {
-                        if (channel == NotificationChannel.IN_APP) {
-                            log.info("IN_APP notification created for user {}", req.getUserId());
-                        } else if (channel == NotificationChannel.EMAIL) {
-                            log.info("EMAIL notification queued for user {}", req.getUserId());
-                        } else if (channel == NotificationChannel.SMS) {
-                            log.info("SMS notification queued for user {}", req.getUserId());
-                        }
-                    } else {
-                        log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
-                    }
+                NotificationParams params = NotificationParams.builder()
+                        .userId(req.getUserId()).email(req.getEmail()).phone(req.getPhoneNumber())
+                        .title(req.getTitle()).message(req.getMessage())
+                        .type(req.getType()).channel(channel)
+                        .redirectUrl(req.getRedirectUrl()).referenceId(req.getReferenceId())
+                        .priority(req.getPriority()).sendMode(SendMode.SEND_NOW)
+                        .scheduledAt(System.currentTimeMillis()).maxRetries(defaultMaxRetries)
+                        .build();
+                if (repository.saveIdempotent(buildNotification(params))) {
+                    log.info("{} notification queued/created for user {}", channel, req.getUserId());
+                } else {
+                    log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
                 }
             } catch (Exception e) {
                 log.error("Failed to process channel {} for user {}", cStr, req.getUserId(), e);

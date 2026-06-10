@@ -74,11 +74,11 @@ public class SmsSenderService {
                 errorMsg.contains("not enabled")) {
                 throw new PermanentFailureException("Permanent Twilio Error: " + e.getMessage(), e);
             }
-            // For other API exceptions (like timeout, server error), throw a standard RuntimeException to retry
-            throw new RuntimeException("Temporary SMS sending failed", e);
+            // For other API exceptions (like timeout, server error), throw SmsSendingException to retry
+            throw new org.notification.exception.SmsSendingException("Temporary SMS sending failed: " + e.getMessage(), e);
         } catch (Exception e) {
             log.error("Failed to send SMS to {}", normalizedTo, e);
-            throw new RuntimeException("SMS sending failed", e);
+            throw new org.notification.exception.SmsSendingException("SMS sending failed: " + e.getMessage(), e);
         }
     }
 

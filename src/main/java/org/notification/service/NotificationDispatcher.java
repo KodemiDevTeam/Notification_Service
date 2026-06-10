@@ -21,7 +21,7 @@ public class NotificationDispatcher {
     public void dispatch(Notification notification) {
         switch (notification.getChannel()) {
             case EMAIL:
-                if (!org.notification.config.ProviderConfigValidator.isEmailEnabled) {
+                if (!org.notification.config.ProviderConfigValidator.isEmailEnabled()) {
                     throw new org.notification.exception.ProviderDisabledException("EMAIL_PROVIDER_DISABLED");
                 }
                 if (notification.getRecipientEmail() == null || notification.getRecipientEmail().isBlank()) {
@@ -37,7 +37,7 @@ public class NotificationDispatcher {
                 }
                 break;
             case SMS:
-                if (!org.notification.config.ProviderConfigValidator.isSmsEnabled) {
+                if (!org.notification.config.ProviderConfigValidator.isSmsEnabled()) {
                     throw new org.notification.exception.ProviderDisabledException("SMS_PROVIDER_DISABLED");
                 }
                 if (notification.getRecipientPhone() == null || notification.getRecipientPhone().isBlank()) {

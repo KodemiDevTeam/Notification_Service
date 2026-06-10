@@ -18,7 +18,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -58,13 +57,10 @@ public class NotificationScheduler {
         dueList.addAll(retryScheduled);
         
         // Sort by scheduledAt
-        dueList.sort(new Comparator<Notification>() {
-            @Override
-            public int compare(Notification n1, Notification n2) {
-                Long s1 = n1.getScheduledAt() != null ? n1.getScheduledAt() : 0L;
-                Long s2 = n2.getScheduledAt() != null ? n2.getScheduledAt() : 0L;
-                return s1.compareTo(s2);
-            }
+        dueList.sort((n1, n2) -> {
+            Long s1 = n1.getScheduledAt() != null ? n1.getScheduledAt() : 0L;
+            Long s2 = n2.getScheduledAt() != null ? n2.getScheduledAt() : 0L;
+            return s1.compareTo(s2);
         });
 
         // Enforce batch limit across both lists combined

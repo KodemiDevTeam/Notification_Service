@@ -27,24 +27,31 @@ public class ProviderConfigValidator {
     @Value("${twilio.phone-number:#{null}}")
     private String twilioPhoneNumber;
 
-    public static boolean isEmailEnabled = true;
-    public static boolean isSmsEnabled = true;
+    private static final boolean[] FLAGS = {true, true}; // [0]=emailEnabled, [1]=smsEnabled
+
+    public static boolean isEmailEnabled() {
+        return FLAGS[0];
+    }
+
+    public static boolean isSmsEnabled() {
+        return FLAGS[1];
+    }
 
     @PostConstruct
     public void validate() {
-        if (mailHost == null || mailHost.isBlank() || 
-            mailUsername == null || mailUsername.isBlank() || 
-            mailPassword == null || mailPassword.isBlank()) {
-            isEmailEnabled = false;
+        if (mailHost == null || mailHost.isBlank()
+                || mailUsername == null || mailUsername.isBlank()
+                || mailPassword == null || mailPassword.isBlank()) {
+            FLAGS[0] = false;
             log.warn("EMAIL_PROVIDER_DISABLED: Email configuration (host, username, or password) is missing.");
         } else {
             log.info("Email provider is configured successfully.");
         }
 
-        if (twilioAccountSid == null || twilioAccountSid.isBlank() || 
-            twilioAuthToken == null || twilioAuthToken.isBlank() || 
-            twilioPhoneNumber == null || twilioPhoneNumber.isBlank()) {
-            isSmsEnabled = false;
+        if (twilioAccountSid == null || twilioAccountSid.isBlank()
+                || twilioAuthToken == null || twilioAuthToken.isBlank()
+                || twilioPhoneNumber == null || twilioPhoneNumber.isBlank()) {
+            FLAGS[1] = false;
             log.warn("SMS_PROVIDER_DISABLED: Twilio configuration (accountSid, authToken, or phoneNumber) is missing.");
         } else {
             log.info("SMS provider is configured successfully.");

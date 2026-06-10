@@ -21,6 +21,8 @@ import org.notification.util.JwtUtil;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
 
+    private static final String MESSAGE = "message";
+
     private final NotificationService service;
     private final JwtUtil jwtUtil;
 
@@ -57,7 +59,7 @@ public class NotificationController {
     @PostMapping("/send")
     public ResponseEntity<Map<String, String>> sendNotification(@Valid @RequestBody NotificationRequest request) {
         service.sendImmediate(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Notification queued for immediate sending."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(MESSAGE, "Notification queued for immediate sending."));
     }
 
     @PostMapping("/internal/send")
@@ -68,34 +70,34 @@ public class NotificationController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         service.sendInternal(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Internal multi-channel notification queued."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(MESSAGE, "Internal multi-channel notification queued."));
     }
 
     @PostMapping("/in-app")
     public ResponseEntity<Map<String, String>> sendInAppNotification(@Valid @RequestBody NotificationRequest request) {
         request.setChannel(org.notification.model.enums.NotificationChannel.IN_APP);
         service.sendImmediate(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "In-app notification queued."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(MESSAGE, "In-app notification queued."));
     }
 
     @PostMapping("/email")
     public ResponseEntity<Map<String, String>> sendEmailNotification(@Valid @RequestBody NotificationRequest request) {
         request.setChannel(org.notification.model.enums.NotificationChannel.EMAIL);
         service.sendImmediate(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Email notification queued."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(MESSAGE, "Email notification queued."));
     }
 
     @PostMapping("/sms")
     public ResponseEntity<Map<String, String>> sendSmsNotification(@Valid @RequestBody NotificationRequest request) {
         request.setChannel(org.notification.model.enums.NotificationChannel.SMS);
         service.sendImmediate(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "SMS notification queued."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(MESSAGE, "SMS notification queued."));
     }
 
     @PostMapping("/schedule")
     public ResponseEntity<Map<String, String>> scheduleNotification(@Valid @RequestBody ScheduledNotificationRequest request) {
         service.schedule(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Notification scheduled successfully."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(MESSAGE, "Notification scheduled successfully."));
     }
 
     @GetMapping("/me")
@@ -117,7 +119,7 @@ public class NotificationController {
         String userId = jwtUtil.extractUserId(token);
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         service.markAllAsRead(userId);
-        return ResponseEntity.ok(Map.of("message", "All user notifications marked as read."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "All user notifications marked as read."));
     }
 
     @GetMapping("/user/{userId}")
@@ -150,7 +152,7 @@ public class NotificationController {
             @PathVariable String notificationId) {
         // ideally check if notification belongs to user, but let's keep it simple or delegate to service
         service.markAsRead(notificationId);
-        return ResponseEntity.ok(Map.of("message", "Notification marked as read."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "Notification marked as read."));
     }
 
     @PatchMapping("/user/{userId}/read-all")
@@ -163,7 +165,7 @@ public class NotificationController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         service.markAllAsRead(userId);
-        return ResponseEntity.ok(Map.of("message", "All user notifications marked as read."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "All user notifications marked as read."));
     }
 
     private boolean isSuperOrUserAdmin(String role) {
@@ -173,30 +175,30 @@ public class NotificationController {
     @PatchMapping("/broadcast/{batchId}/cancel")
     public ResponseEntity<Map<String, String>> cancelBroadcast(@PathVariable String batchId) {
         service.cancelBatch(batchId);
-        return ResponseEntity.ok(Map.of("message", "Broadcast batch cancelled successfully."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "Broadcast batch cancelled successfully."));
     }
 
     @PostMapping("/broadcast/{batchId}/send-now")
     public ResponseEntity<Map<String, String>> sendNowBroadcast(@PathVariable String batchId) {
         service.sendNowBatch(batchId);
-        return ResponseEntity.ok(Map.of("message", "Broadcast batch scheduled for immediate sending."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "Broadcast batch scheduled for immediate sending."));
     }
 
     @PatchMapping("/broadcast/{batchId}/reschedule")
     public ResponseEntity<Map<String, String>> rescheduleBroadcast(@PathVariable String batchId, @RequestBody Map<String, Long> request) {
         service.rescheduleBatch(batchId, request.get("scheduledAt"));
-        return ResponseEntity.ok(Map.of("message", "Broadcast batch rescheduled successfully."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "Broadcast batch rescheduled successfully."));
     }
 
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<Map<String, String>> deleteNotification(@PathVariable String notificationId) {
         service.deleteNotification(notificationId);
-        return ResponseEntity.ok(Map.of("message", "Notification deleted successfully."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "Notification deleted successfully."));
     }
 
     @DeleteMapping("/user/{userId}/clear")
     public ResponseEntity<Map<String, String>> clearUserNotifications(@PathVariable String userId) {
         service.clearUserNotifications(userId);
-        return ResponseEntity.ok(Map.of("message", "All notifications cleared for user."));
+        return ResponseEntity.ok(Map.of(MESSAGE, "All notifications cleared for user."));
     }
 }
