@@ -43,13 +43,13 @@ public class ProviderConfigValidator {
         return smsEnabled;
     }
 
-    /** Package-visible for testing only. */
-    static void setEmailEnabled(boolean value) {
+    /** Visible for testing — resets the flag without a full Spring context. */
+    public static void setEmailEnabled(boolean value) {
         emailEnabled = value;
     }
 
-    /** Package-visible for testing only. */
-    static void setSmsEnabled(boolean value) {
+    /** Visible for testing — resets the flag without a full Spring context. */
+    public static void setSmsEnabled(boolean value) {
         smsEnabled = value;
     }
 
