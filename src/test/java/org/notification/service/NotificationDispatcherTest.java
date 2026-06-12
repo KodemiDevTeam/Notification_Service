@@ -29,13 +29,8 @@ class NotificationDispatcherTest {
     private NotificationDispatcher dispatcher;
 
     @BeforeEach
-    void enableProviders() {
-        ProviderConfigValidator.setEmailEnabled(true);
-        ProviderConfigValidator.setSmsEnabled(true);
-    }
-
     @AfterEach
-    void restoreProviders() {
+    void resetProviders() {
         ProviderConfigValidator.setEmailEnabled(true);
         ProviderConfigValidator.setSmsEnabled(true);
     }

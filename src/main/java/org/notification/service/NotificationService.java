@@ -147,46 +147,25 @@ public class NotificationService {
 
         switch (req.getSendMode()) {
             case SEND_NOW:
-                saveRecord(batchId, userId, email, phone, channel, req, now, null, null, null);
+                saveNotification(buildBroadcastParams(batchId, userId, email, phone, channel, req, now, null, null, null));
                 return 1;
             case SCHEDULED, CUSTOM_RECURRING:
-                saveRecord(batchId, userId, email, phone, channel, req,
-                        parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null);
+                saveNotification(buildBroadcastParams(batchId, userId, email, phone, channel, req,
+                        parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null));
                 return 1;
             case DAILY_MORNING:
-                return tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId));
+                return tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "MORNING",
+                        req.getMorningTime(), defaultMorningTime, zoneId);
             case DAILY_EVENING:
-                return tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId));
+                return tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "EVENING",
+                        req.getEveningTime(), defaultEveningTime, zoneId);
             case DAILY_MORNING_EVENING:
-                return tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId))
-                     + tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId));
+                return tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "MORNING",
+                            req.getMorningTime(), defaultMorningTime, zoneId)
+                     + tryCreateRecurring(batchId, userId, email, phone, channel, req, today, "EVENING",
+                            req.getEveningTime(), defaultEveningTime, zoneId);
             default:
                 return 0;
-        }
-    }
-
-    private static final class RecurringParams {
-        final String batchId;
-        final String userId;
-        final String email;
-        final String phone;
-        final NotificationChannel channel;
-        final BroadcastNotificationRequest req;
-        final LocalDate date;
-        final String slot;
-        final String reqTime;
-        final String defTime;
-        final ZoneId zone;
-
-        RecurringParams(String batchId, String userId, String email, String phone,
-                        NotificationChannel channel, BroadcastNotificationRequest req,
-                        LocalDate date, String slot, String reqTime, String defTime, ZoneId zone) {
-            this.batchId = batchId; this.userId = userId;
-            this.email = email; this.phone = phone;
-            this.channel = channel; this.req = req;
-            this.date = date; this.slot = slot;
-            this.reqTime = reqTime; this.defTime = defTime;
-            this.zone = zone;
         }
     }
 
@@ -200,23 +179,26 @@ public class NotificationService {
         }
     }
 
-    private int tryCreateRecurring(RecurringParams p) {
-        String dateStr = p.date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        String recurrenceKey = String.format("%s_%s_%s_%s_%s", p.batchId, p.userId, p.channel.name(), dateStr, p.slot);
+    private int tryCreateRecurring(String batchId, String userId, String email, String phone,
+                                    NotificationChannel channel, BroadcastNotificationRequest req,
+                                    LocalDate date, String slot, String reqTime, String defTime, ZoneId zone) {
+        String dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String recurrenceKey = String.format("%s_%s_%s_%s_%s", batchId, userId, channel.name(), dateStr, slot);
 
         if (repository.existsByRecurrenceKey(recurrenceKey)) return 0;
 
-        String timeStr = (p.reqTime != null && !p.reqTime.isBlank()) ? p.reqTime : p.defTime;
-        long scheduledAt = ZonedDateTime.of(p.date, LocalTime.parse(timeStr), p.zone).toInstant().toEpochMilli();
+        String timeStr = (reqTime != null && !reqTime.isBlank()) ? reqTime : defTime;
+        long scheduledAt = ZonedDateTime.of(date, LocalTime.parse(timeStr), zone).toInstant().toEpochMilli();
 
-        saveRecord(p.batchId, p.userId, p.email, p.phone, p.channel, p.req, scheduledAt, recurrenceKey, dateStr, p.slot);
+        saveNotification(buildBroadcastParams(batchId, userId, email, phone, channel, req, scheduledAt, recurrenceKey, dateStr, slot));
         return 1;
     }
 
-    private void saveRecord(String batchId, String userId, String email, String phone,
-                            NotificationChannel channel, BroadcastNotificationRequest req,
-                            long scheduledAt, String recurrenceKey, String recurrenceDate, String recurrenceSlot) {
-        NotificationParams params = NotificationParams.builder()
+    private NotificationParams buildBroadcastParams(String batchId, String userId, String email, String phone,
+                                                     NotificationChannel channel, BroadcastNotificationRequest req,
+                                                     long scheduledAt, String recurrenceKey,
+                                                     String recurrenceDate, String recurrenceSlot) {
+        return NotificationParams.builder()
                 .userId(userId).email(email).phone(phone)
                 .title(req.getTitle()).message(req.getMessage())
                 .type(req.getType()).channel(channel)
@@ -226,8 +208,11 @@ public class NotificationService {
                 .maxRetries(req.getMaxRetries())
                 .recurrenceKey(recurrenceKey).recurrenceDate(recurrenceDate).recurrenceSlot(recurrenceSlot)
                 .build();
+    }
+
+    private void saveNotification(NotificationParams params) {
         if (!repository.saveIdempotent(buildNotification(params))) {
-            log.info("Duplicate broadcast notification skipped for user {} channel {}", userId, channel);
+            log.info("Duplicate broadcast notification skipped for user {} channel {}", params.userId, params.channel);
         }
     }
 
