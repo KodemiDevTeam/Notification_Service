@@ -150,26 +150,44 @@ public class NotificationService {
                 saveRecord(batchId, userId, email, phone, channel, req, now, null, null, null);
                 return 1;
             case SCHEDULED:
-                saveRecord(batchId, userId, email, phone, channel, req,
-                        parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null);
-                return 1;
-            case DAILY_MORNING:
-                return tryCreateRecurring(batchId, userId, email, phone, channel, req,
-                        today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId);
-            case DAILY_EVENING:
-                return tryCreateRecurring(batchId, userId, email, phone, channel, req,
-                        today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId);
-            case DAILY_MORNING_EVENING:
-                return tryCreateRecurring(batchId, userId, email, phone, channel, req,
-                        today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId)
-                     + tryCreateRecurring(batchId, userId, email, phone, channel, req,
-                        today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId);
             case CUSTOM_RECURRING:
                 saveRecord(batchId, userId, email, phone, channel, req,
                         parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null);
                 return 1;
+            case DAILY_MORNING:
+                return tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId));
+            case DAILY_EVENING:
+                return tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId));
+            case DAILY_MORNING_EVENING:
+                return tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "MORNING", req.getMorningTime(), defaultMorningTime, zoneId))
+                     + tryCreateRecurring(new RecurringParams(batchId, userId, email, phone, channel, req, today, "EVENING", req.getEveningTime(), defaultEveningTime, zoneId));
             default:
                 return 0;
+        }
+    }
+
+    private static final class RecurringParams {
+        final String batchId;
+        final String userId;
+        final String email;
+        final String phone;
+        final NotificationChannel channel;
+        final BroadcastNotificationRequest req;
+        final LocalDate date;
+        final String slot;
+        final String reqTime;
+        final String defTime;
+        final ZoneId zone;
+
+        RecurringParams(String batchId, String userId, String email, String phone,
+                        NotificationChannel channel, BroadcastNotificationRequest req,
+                        LocalDate date, String slot, String reqTime, String defTime, ZoneId zone) {
+            this.batchId = batchId; this.userId = userId;
+            this.email = email; this.phone = phone;
+            this.channel = channel; this.req = req;
+            this.date = date; this.slot = slot;
+            this.reqTime = reqTime; this.defTime = defTime;
+            this.zone = zone;
         }
     }
 
@@ -183,21 +201,16 @@ public class NotificationService {
         }
     }
 
-    private int tryCreateRecurring(String batchId, String userId, String email, String phone, NotificationChannel channel,
-                                   BroadcastNotificationRequest req, LocalDate date, String slot, String reqTime, String defTime, ZoneId zone) {
-        String dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        String recurrenceKey = String.format("%s_%s_%s_%s_%s", batchId, userId, channel.name(), dateStr, slot);
+    private int tryCreateRecurring(RecurringParams p) {
+        String dateStr = p.date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String recurrenceKey = String.format("%s_%s_%s_%s_%s", p.batchId, p.userId, p.channel.name(), dateStr, p.slot);
 
-        if (repository.existsByRecurrenceKey(recurrenceKey)) {
-            return 0; // Prevent duplicate
-        }
+        if (repository.existsByRecurrenceKey(recurrenceKey)) return 0;
 
-        String timeStr = (reqTime != null && !reqTime.isBlank()) ? reqTime : defTime;
-        LocalTime time = LocalTime.parse(timeStr);
-        ZonedDateTime zdt = ZonedDateTime.of(date, time, zone);
-        long scheduledAt = zdt.toInstant().toEpochMilli();
+        String timeStr = (p.reqTime != null && !p.reqTime.isBlank()) ? p.reqTime : p.defTime;
+        long scheduledAt = ZonedDateTime.of(p.date, LocalTime.parse(timeStr), p.zone).toInstant().toEpochMilli();
 
-        saveRecord(batchId, userId, email, phone, channel, req, scheduledAt, recurrenceKey, dateStr, slot);
+        saveRecord(p.batchId, p.userId, p.email, p.phone, p.channel, p.req, scheduledAt, recurrenceKey, dateStr, p.slot);
         return 1;
     }
 
@@ -404,69 +417,72 @@ public class NotificationService {
             @CacheEvict(value = "unreadCount", key = "#req.userId")
     })
     public void sendInternal(NotificationRequest req) {
-        if (req.getChannels() == null || req.getChannels().isEmpty()) {
-            if (req.getChannel() != null) {
-                req.setChannels(java.util.Collections.singletonList(req.getChannel().name()));
-            } else {
-                req.setChannels(java.util.Collections.singletonList(NotificationChannel.IN_APP.name()));
-            }
-        }
+        normalizeChannels(req);
+        fetchContactIfNeeded(req);
+        dispatchInternalChannels(req);
+    }
 
-        boolean fetchContact = false;
-        for (String c : req.getChannels()) {
-            if ("EMAIL".equals(c) && (req.getEmail() == null || req.getEmail().isBlank())) {
-                fetchContact = true;
-            }
-            if ("SMS".equals(c) && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
-                fetchContact = true;
-            }
+    private static void normalizeChannels(NotificationRequest req) {
+        if (req.getChannels() != null && !req.getChannels().isEmpty()) return;
+        if (req.getChannel() != null) {
+            req.setChannels(java.util.Collections.singletonList(req.getChannel().name()));
+        } else {
+            req.setChannels(java.util.Collections.singletonList(NotificationChannel.IN_APP.name()));
         }
+    }
 
-        if (fetchContact) {
-            try {
-                UserNotificationTargetDTO contact = userClient.getUserContact(req.getUserId());
-                if (contact != null) {
-                    if (req.getEmail() == null || req.getEmail().isBlank()) {
-                        req.setEmail(contact.getEmail());
-                    }
-                    if (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank()) {
-                        req.setPhoneNumber(contact.getPhoneNumber());
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to fetch contact details for user {}: {}", req.getUserId(), e.getMessage());
-            }
+    private void fetchContactIfNeeded(NotificationRequest req) {
+        boolean needEmail = req.getChannels().contains("EMAIL") && (req.getEmail() == null || req.getEmail().isBlank());
+        boolean needPhone = req.getChannels().contains("SMS") && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank());
+        if (!needEmail && !needPhone) return;
+
+        try {
+            UserNotificationTargetDTO contact = userClient.getUserContact(req.getUserId());
+            if (contact == null) return;
+            if (needEmail) req.setEmail(contact.getEmail());
+            if (needPhone) req.setPhoneNumber(contact.getPhoneNumber());
+        } catch (Exception e) {
+            log.warn("Failed to fetch contact details for user {}: {}", req.getUserId(), e.getMessage());
         }
+    }
 
+    private void dispatchInternalChannels(NotificationRequest req) {
         for (String cStr : req.getChannels()) {
             try {
                 NotificationChannel channel = NotificationChannel.valueOf(cStr);
-
-                if (channel == NotificationChannel.EMAIL && (req.getEmail() == null || req.getEmail().isBlank())) {
-                    log.warn("Skipping EMAIL for user {} due to missing email address.", req.getUserId());
-                    continue;
-                }
-                if (channel == NotificationChannel.SMS && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
-                    log.warn("Skipping SMS for user {} due to missing phone number.", req.getUserId());
-                    continue;
-                }
-
-                NotificationParams params = NotificationParams.builder()
-                        .userId(req.getUserId()).email(req.getEmail()).phone(req.getPhoneNumber())
-                        .title(req.getTitle()).message(req.getMessage())
-                        .type(req.getType()).channel(channel)
-                        .redirectUrl(req.getRedirectUrl()).referenceId(req.getReferenceId())
-                        .priority(req.getPriority()).sendMode(SendMode.SEND_NOW)
-                        .scheduledAt(System.currentTimeMillis()).maxRetries(defaultMaxRetries)
-                        .build();
-                if (repository.saveIdempotent(buildNotification(params))) {
-                    log.info("{} notification queued/created for user {}", channel, req.getUserId());
-                } else {
-                    log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
-                }
+                if (!isContactPresent(channel, req)) continue;
+                saveInternalNotification(req, channel);
             } catch (Exception e) {
                 log.error("Failed to process channel {} for user {}", cStr, req.getUserId(), e);
             }
+        }
+    }
+
+    private boolean isContactPresent(NotificationChannel channel, NotificationRequest req) {
+        if (channel == NotificationChannel.EMAIL && (req.getEmail() == null || req.getEmail().isBlank())) {
+            log.warn("Skipping EMAIL for user {} due to missing email address.", req.getUserId());
+            return false;
+        }
+        if (channel == NotificationChannel.SMS && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
+            log.warn("Skipping SMS for user {} due to missing phone number.", req.getUserId());
+            return false;
+        }
+        return true;
+    }
+
+    private void saveInternalNotification(NotificationRequest req, NotificationChannel channel) {
+        NotificationParams params = NotificationParams.builder()
+                .userId(req.getUserId()).email(req.getEmail()).phone(req.getPhoneNumber())
+                .title(req.getTitle()).message(req.getMessage())
+                .type(req.getType()).channel(channel)
+                .redirectUrl(req.getRedirectUrl()).referenceId(req.getReferenceId())
+                .priority(req.getPriority()).sendMode(SendMode.SEND_NOW)
+                .scheduledAt(System.currentTimeMillis()).maxRetries(defaultMaxRetries)
+                .build();
+        if (repository.saveIdempotent(buildNotification(params))) {
+            log.info("{} notification queued/created for user {}", channel, req.getUserId());
+        } else {
+            log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
         }
     }
 

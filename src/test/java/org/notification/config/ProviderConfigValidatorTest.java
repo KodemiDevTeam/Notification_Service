@@ -1,11 +1,19 @@
 package org.notification.config;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProviderConfigValidatorTest {
+
+    @AfterEach
+    void resetFlags() {
+        // Restore defaults after each test so the static state doesn't leak
+        ProviderConfigValidator.setEmailEnabled(true);
+        ProviderConfigValidator.setSmsEnabled(true);
+    }
 
     private ProviderConfigValidator buildAndValidate(
             String mailHost, String mailUser, String mailPass,

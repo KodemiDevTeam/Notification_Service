@@ -3,6 +3,7 @@ package org.notification.scheduler;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.notification.exception.PermanentFailureException;
+import org.notification.exception.ProviderDisabledException;
 import org.notification.model.Notification;
 import org.notification.model.enums.NotificationStatus;
 import org.notification.model.enums.SendMode;
@@ -25,6 +26,9 @@ import java.util.UUID;
 @Component
 @ConditionalOnProperty(name = "notification.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 public class NotificationScheduler {
+
+    private static final long TTL_7_DAYS_SECONDS = 7L * 24 * 60 * 60;
+    private static final long RETRY_DELAY_MS = 300_000L; // 5 minutes
 
     private final NotificationRepository repository;
     private final NotificationDispatcher dispatcher;
@@ -49,154 +53,162 @@ public class NotificationScheduler {
         long now = System.currentTimeMillis();
         log.info("Scheduler running at {}...", now);
 
-        List<Notification> pending = repository.findDueNotifications(now, batchSize, NotificationStatus.PENDING);
-        List<Notification> retryScheduled = repository.findDueNotifications(now, batchSize, NotificationStatus.RETRY_SCHEDULED);
+        List<Notification> dueList = collectAndSort(now);
+        if (dueList.isEmpty()) return;
 
+        dueList.forEach(this::processIfLockAcquired);
+    }
+
+    private void processIfLockAcquired(Notification notification) {
+        if (tryAcquireLock(notification)) {
+            processNotification(notification);
+        }
+    }
+
+    private List<Notification> collectAndSort(long now) {
         List<Notification> dueList = new ArrayList<>();
-        dueList.addAll(pending);
-        dueList.addAll(retryScheduled);
-        
-        // Sort by scheduledAt
-        dueList.sort((n1, n2) -> {
-            Long s1 = n1.getScheduledAt() != null ? n1.getScheduledAt() : 0L;
-            Long s2 = n2.getScheduledAt() != null ? n2.getScheduledAt() : 0L;
-            return s1.compareTo(s2);
+        dueList.addAll(repository.findDueNotifications(now, batchSize, NotificationStatus.PENDING));
+        dueList.addAll(repository.findDueNotifications(now, batchSize, NotificationStatus.RETRY_SCHEDULED));
+        dueList.sort((a, b) -> {
+            long s1 = a.getScheduledAt() != null ? a.getScheduledAt() : 0L;
+            long s2 = b.getScheduledAt() != null ? b.getScheduledAt() : 0L;
+            return Long.compare(s1, s2);
         });
+        return dueList.size() > batchSize ? dueList.subList(0, batchSize) : dueList;
+    }
 
-        // Enforce batch limit across both lists combined
-        if (dueList.size() > batchSize) {
-            dueList = dueList.subList(0, batchSize);
-        }
-
-        if (dueList.isEmpty()) {
-            return;
-        }
-
-        for (Notification notification : dueList) {
-            try {
-                // Production-ready atomic lock using explicit DynamoDB UpdateItem
-                boolean locked = repository.acquireLock(notification.getNotificationId(), notification.getStatus(), NotificationStatus.PROCESSING);
-                if (!locked) {
-                    log.warn("Failed to lock notification {}: picked up by another instance or already processed.", notification.getNotificationId());
-                    continue;
-                }
-                // Update local object to reflect the new state
+    private boolean tryAcquireLock(Notification notification) {
+        try {
+            boolean locked = repository.acquireLock(
+                    notification.getNotificationId(), notification.getStatus(), NotificationStatus.PROCESSING);
+            if (locked) {
                 notification.setStatus(NotificationStatus.PROCESSING);
-            } catch (Exception e) {
-                log.warn("Exception while locking notification {}: {}", notification.getNotificationId(), e.getMessage());
-                continue;
+            } else {
+                log.warn("Failed to lock notification {}: already processed.", notification.getNotificationId());
             }
+            return locked;
+        } catch (Exception e) {
+            log.warn("Exception while locking notification {}: {}", notification.getNotificationId(), e.getMessage());
+            return false;
+        }
+    }
 
-            try {
-                // Dispatch
-                dispatcher.dispatch(notification);
-                
-                // Success
-                notification.setStatus(NotificationStatus.SENT);
-                notification.setSentAt(System.currentTimeMillis());
-                notification.setUpdatedAt(System.currentTimeMillis());
-                notification.setExpirationTime((System.currentTimeMillis() / 1000) + (7L * 24 * 60 * 60));
-                notification.setFailureReason(null);
-                repository.save(notification); // Safe to use save() here since we hold the PROCESSING lock
-                
-                scheduleNextRecurrenceIfApplicable(notification);
+    private void processNotification(Notification notification) {
+        try {
+            dispatcher.dispatch(notification);
+            markSent(notification);
+            scheduleNextRecurrenceIfApplicable(notification);
+        } catch (ProviderDisabledException e) {
+            markSkipped(notification, e.getMessage());
+            scheduleNextRecurrenceIfApplicable(notification);
+        } catch (PermanentFailureException e) {
+            log.error("Permanent failure sending notification {}", notification.getNotificationId(), e);
+            markFailed(notification, e.getMessage());
+            scheduleNextRecurrenceIfApplicable(notification);
+        } catch (Throwable e) {
+            log.error("Temporary failure sending notification {}", notification.getNotificationId(), e);
+            handleTemporaryFailure(notification, e.getMessage());
+        }
+    }
 
-            } catch (org.notification.exception.ProviderDisabledException e) {
-                log.warn("Provider disabled for notification {}, marking SKIPPED", notification.getNotificationId());
-                notification.setStatus(NotificationStatus.SKIPPED);
-                notification.setFailureReason(e.getMessage());
-                notification.setUpdatedAt(System.currentTimeMillis());
-                notification.setExpirationTime((System.currentTimeMillis() / 1000) + (7L * 24 * 60 * 60));
-                repository.save(notification);
+    private void markSent(Notification n) {
+        long now = System.currentTimeMillis();
+        n.setStatus(NotificationStatus.SENT);
+        n.setSentAt(now);
+        n.setUpdatedAt(now);
+        n.setExpirationTime((now / 1000) + TTL_7_DAYS_SECONDS);
+        n.setFailureReason(null);
+        repository.save(n);
+    }
 
-                scheduleNextRecurrenceIfApplicable(notification);
+    private void markSkipped(Notification n, String reason) {
+        long now = System.currentTimeMillis();
+        log.warn("Provider disabled for notification {}, marking SKIPPED", n.getNotificationId());
+        n.setStatus(NotificationStatus.SKIPPED);
+        n.setFailureReason(reason);
+        n.setUpdatedAt(now);
+        n.setExpirationTime((now / 1000) + TTL_7_DAYS_SECONDS);
+        repository.save(n);
+    }
 
-            } catch (PermanentFailureException e) {
-                log.error("Permanent failure sending notification {}", notification.getNotificationId(), e);
-                notification.setStatus(NotificationStatus.FAILED);
-                notification.setFailedAt(System.currentTimeMillis());
-                notification.setFailureReason(e.getMessage());
-                notification.setUpdatedAt(System.currentTimeMillis());
-                notification.setExpirationTime((System.currentTimeMillis() / 1000) + (7L * 24 * 60 * 60));
-                repository.save(notification);
+    private void markFailed(Notification n, String reason) {
+        long now = System.currentTimeMillis();
+        n.setStatus(NotificationStatus.FAILED);
+        n.setFailedAt(now);
+        n.setFailureReason(reason);
+        n.setUpdatedAt(now);
+        n.setExpirationTime((now / 1000) + TTL_7_DAYS_SECONDS);
+        repository.save(n);
+    }
 
-                scheduleNextRecurrenceIfApplicable(notification);
+    private void handleTemporaryFailure(Notification n, String reason) {
+        int retries = (n.getRetryCount() != null ? n.getRetryCount() : 0) + 1;
+        int maxRetries = n.getMaxRetries() != null ? n.getMaxRetries() : 3;
 
-            } catch (Throwable e) {
-                log.error("Temporary failure sending notification {}", notification.getNotificationId(), e);
-                int retries = notification.getRetryCount() != null ? notification.getRetryCount() : 0;
-                int maxRetries = notification.getMaxRetries() != null ? notification.getMaxRetries() : 3;
-                
-                retries++;
-                notification.setRetryCount(retries);
-                notification.setFailureReason(e.getMessage());
-                notification.setUpdatedAt(System.currentTimeMillis());
+        n.setRetryCount(retries);
+        n.setFailureReason(reason);
+        n.setUpdatedAt(System.currentTimeMillis());
 
-                if (retries >= maxRetries) {
-                    notification.setStatus(NotificationStatus.FAILED);
-                    notification.setFailedAt(System.currentTimeMillis());
-                    notification.setExpirationTime((System.currentTimeMillis() / 1000) + (7L * 24 * 60 * 60));
-                    scheduleNextRecurrenceIfApplicable(notification);
-                } else {
-                    notification.setStatus(NotificationStatus.RETRY_SCHEDULED);
-                    // Exponential backoff or fixed 5 minutes
-                    long nextRetry = System.currentTimeMillis() + (300000L); // 5 minutes
-                    notification.setNextRetryAt(nextRetry);
-                    notification.setScheduledAt(nextRetry); // Update index key so it gets picked up
-                }
-                repository.save(notification);
-            }
+        if (retries >= maxRetries) {
+            markFailed(n, reason);
+            scheduleNextRecurrenceIfApplicable(n);
+        } else {
+            long nextRetry = System.currentTimeMillis() + RETRY_DELAY_MS;
+            n.setStatus(NotificationStatus.RETRY_SCHEDULED);
+            n.setNextRetryAt(nextRetry);
+            n.setScheduledAt(nextRetry);
+            repository.save(n);
         }
     }
 
     private void scheduleNextRecurrenceIfApplicable(Notification current) {
-        if (current.getSendMode() == SendMode.DAILY_MORNING ||
-            current.getSendMode() == SendMode.DAILY_EVENING ||
-            current.getSendMode() == SendMode.DAILY_MORNING_EVENING ||
-            current.getSendMode() == SendMode.CUSTOM_RECURRING) {
-            
-            // Advance date by 1 day
-            ZoneId zoneId = ZoneId.of(defaultTimezone);
-            LocalDate date = Instant.ofEpochMilli(current.getScheduledAt()).atZone(zoneId).toLocalDate().plusDays(1);
-            String dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-            String slot = current.getRecurrenceSlot();
-            if (slot == null) slot = "DAILY"; // fallback
+        if (!isRecurring(current.getSendMode())) return;
 
-            String newRecurrenceKey = String.format("%s_%s_%s_%s_%s", 
-                current.getBatchId(), 
-                current.getUserId(), 
-                current.getChannel().name(), 
-                dateStr, 
-                slot);
+        ZoneId zoneId = ZoneId.of(defaultTimezone);
+        LocalDate date = Instant.ofEpochMilli(current.getScheduledAt()).atZone(zoneId).toLocalDate().plusDays(1);
+        String dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String slot = current.getRecurrenceSlot() != null ? current.getRecurrenceSlot() : "DAILY";
 
-            if (!repository.existsByRecurrenceKey(newRecurrenceKey)) {
-                Notification next = new Notification();
-                next.setBatchId(current.getBatchId());
-                next.setUserId(current.getUserId());
-                next.setRecipientEmail(current.getRecipientEmail());
-                next.setRecipientPhone(current.getRecipientPhone());
-                next.setTitle(current.getTitle());
-                next.setMessage(current.getMessage());
-                next.setType(current.getType());
-                next.setChannel(current.getChannel());
-                next.setStatus(NotificationStatus.PENDING);
-                next.setSendMode(current.getSendMode());
-                
-                // Add exactly 24 hours to the scheduled time
-                next.setScheduledAt(current.getScheduledAt() + 86400000L); 
-                
-                next.setCreatedAt(System.currentTimeMillis());
-                next.setUpdatedAt(System.currentTimeMillis());
-                next.setMaxRetries(current.getMaxRetries());
-                next.setRedirectUrl(current.getRedirectUrl());
-                
-                next.setRecurrenceKey(newRecurrenceKey);
-                next.setRecurrenceDate(dateStr);
-                next.setRecurrenceSlot(slot);
+        String newRecurrenceKey = String.format("%s_%s_%s_%s_%s",
+                current.getBatchId(), current.getUserId(),
+                current.getChannel().name(), dateStr, slot);
 
-                dynamoDBMapper.save(next);
-                log.info("Scheduled next recurring notification for batch {} user {} date {}", next.getBatchId(), next.getUserId(), dateStr);
-            }
+        if (!repository.existsByRecurrenceKey(newRecurrenceKey)) {
+            dynamoDBMapper.save(buildNextRecurrence(current, newRecurrenceKey, dateStr, slot));
+            log.info("Scheduled next recurring notification for batch {} user {} date {}",
+                    current.getBatchId(), current.getUserId(), dateStr);
         }
+    }
+
+    private static boolean isRecurring(SendMode mode) {
+        return mode == SendMode.DAILY_MORNING
+                || mode == SendMode.DAILY_EVENING
+                || mode == SendMode.DAILY_MORNING_EVENING
+                || mode == SendMode.CUSTOM_RECURRING;
+    }
+
+    private Notification buildNextRecurrence(Notification current, String recurrenceKey, String dateStr, String slot) {
+        Notification next = new Notification();
+        next.setNotificationId(UUID.randomUUID().toString());
+        next.setBatchId(current.getBatchId());
+        next.setUserId(current.getUserId());
+        next.setRecipientEmail(current.getRecipientEmail());
+        next.setRecipientPhone(current.getRecipientPhone());
+        next.setTitle(current.getTitle());
+        next.setMessage(current.getMessage());
+        next.setType(current.getType());
+        next.setChannel(current.getChannel());
+        next.setStatus(NotificationStatus.PENDING);
+        next.setSendMode(current.getSendMode());
+        next.setScheduledAt(current.getScheduledAt() + 86_400_000L);
+        long now = System.currentTimeMillis();
+        next.setCreatedAt(now);
+        next.setUpdatedAt(now);
+        next.setMaxRetries(current.getMaxRetries());
+        next.setRedirectUrl(current.getRedirectUrl());
+        next.setRecurrenceKey(recurrenceKey);
+        next.setRecurrenceDate(dateStr);
+        next.setRecurrenceSlot(slot);
+        return next;
     }
 }

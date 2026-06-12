@@ -1,17 +1,20 @@
 package org.notification.service;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.notification.config.ProviderConfigValidator;
+import org.notification.exception.PermanentFailureException;
+import org.notification.exception.ProviderDisabledException;
 import org.notification.model.Notification;
 import org.notification.model.enums.NotificationChannel;
 
-import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationDispatcherTest {
@@ -25,150 +28,146 @@ class NotificationDispatcherTest {
     @InjectMocks
     private NotificationDispatcher dispatcher;
 
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    /** Stubs the static provider flags: email=true, sms=true. */
-    private static void stubProvidersEnabled(MockedStatic<ProviderConfigValidator> mocked) {
-        mocked.when(ProviderConfigValidator::isEmailEnabled).thenReturn(true);
-        mocked.when(ProviderConfigValidator::isSmsEnabled).thenReturn(true);
+    @BeforeEach
+    void enableProviders() {
+        ProviderConfigValidator.setEmailEnabled(true);
+        ProviderConfigValidator.setSmsEnabled(true);
     }
 
-    // ── email dispatch ─────────────────────────────────────────────────────────
+    @AfterEach
+    void restoreProviders() {
+        ProviderConfigValidator.setEmailEnabled(true);
+        ProviderConfigValidator.setSmsEnabled(true);
+    }
+
+    // ── email ──────────────────────────────────────────────────────────────────
 
     @Test
-    void testDispatchEmail() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            stubProvidersEnabled(mocked);
+    void testDispatchEmail_Success() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.EMAIL);
+        n.setRecipientEmail("test@example.com");
+        n.setTitle("Title");
+        n.setMessage("Message");
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.EMAIL);
-            n.setRecipientEmail("test@example.com");
-            n.setTitle("Title");
-            n.setMessage("Message");
+        dispatcher.dispatch(n);
 
-            dispatcher.dispatch(n);
-
-            verify(emailSenderService, times(1)).sendEmail("test@example.com", "Title", "Message");
-            verifyNoInteractions(smsSenderService);
-        }
+        verify(emailSenderService).sendEmail("test@example.com", "Title", "Message");
+        verifyNoInteractions(smsSenderService);
     }
 
     @Test
     void testDispatchEmail_ProviderDisabled() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            mocked.when(ProviderConfigValidator::isEmailEnabled).thenReturn(false);
+        ProviderConfigValidator.setEmailEnabled(false);
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.EMAIL);
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.EMAIL);
 
-            assertThrows(org.notification.exception.ProviderDisabledException.class, () -> dispatcher.dispatch(n));
-            verifyNoInteractions(emailSenderService);
-        }
+        assertThrows(ProviderDisabledException.class, () -> dispatcher.dispatch(n));
+        verifyNoInteractions(emailSenderService);
     }
 
     @Test
-    void testDispatchEmail_MissingEmail() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            stubProvidersEnabled(mocked);
+    void testDispatchEmail_MissingEmail_ThrowsPermanentFailure() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.EMAIL);
+        n.setRecipientEmail("");
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.EMAIL);
-            n.setRecipientEmail("");
-
-            assertThrows(org.notification.exception.PermanentFailureException.class, () -> dispatcher.dispatch(n));
-            verifyNoInteractions(emailSenderService);
-        }
+        assertThrows(PermanentFailureException.class, () -> dispatcher.dispatch(n));
+        verifyNoInteractions(emailSenderService);
     }
 
     @Test
-    void testDispatchEmail_InvalidEmailException() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            stubProvidersEnabled(mocked);
+    void testDispatchEmail_NullEmail_ThrowsPermanentFailure() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.EMAIL);
+        n.setRecipientEmail(null);
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.EMAIL);
-            n.setRecipientEmail("bad-email");
-            n.setTitle("Title");
-            n.setMessage("Msg");
-
-            doThrow(new RuntimeException("invalid address")).when(emailSenderService).sendEmail(any(), any(), any());
-
-            assertThrows(org.notification.exception.PermanentFailureException.class, () -> dispatcher.dispatch(n));
-        }
+        assertThrows(PermanentFailureException.class, () -> dispatcher.dispatch(n));
+        verifyNoInteractions(emailSenderService);
     }
 
     @Test
-    void testDispatchEmail_GenericException() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            stubProvidersEnabled(mocked);
+    void testDispatchEmail_InvalidEmailException_WrapsAsPermanentFailure() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.EMAIL);
+        n.setRecipientEmail("bad-email");
+        n.setTitle("Title");
+        n.setMessage("Msg");
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.EMAIL);
-            n.setRecipientEmail("good@example.com");
-            n.setTitle("Title");
-            n.setMessage("Msg");
+        doThrow(new RuntimeException("invalid address")).when(emailSenderService).sendEmail(any(), any(), any());
 
-            doThrow(new RuntimeException("SMTP Server Down")).when(emailSenderService).sendEmail(any(), any(), any());
-
-            assertThrows(RuntimeException.class, () -> dispatcher.dispatch(n));
-        }
+        assertThrows(PermanentFailureException.class, () -> dispatcher.dispatch(n));
     }
 
-    // ── SMS dispatch ───────────────────────────────────────────────────────────
+    @Test
+    void testDispatchEmail_GenericSmtpException_Rethrows() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.EMAIL);
+        n.setRecipientEmail("good@example.com");
+        n.setTitle("Title");
+        n.setMessage("Msg");
+
+        doThrow(new RuntimeException("SMTP Server Down")).when(emailSenderService).sendEmail(any(), any(), any());
+
+        assertThrows(RuntimeException.class, () -> dispatcher.dispatch(n));
+    }
+
+    // ── SMS ────────────────────────────────────────────────────────────────────
 
     @Test
-    void testDispatchSms() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            stubProvidersEnabled(mocked);
+    void testDispatchSms_Success() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.SMS);
+        n.setRecipientPhone("+919000000000");
+        n.setTitle("Alert");
+        n.setMessage("Message");
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.SMS);
-            n.setRecipientPhone("+919000000000");
-            n.setTitle("Alert");
-            n.setMessage("Message");
+        dispatcher.dispatch(n);
 
-            dispatcher.dispatch(n);
-
-            verify(smsSenderService, times(1)).sendSms("+919000000000", "Alert: Message");
-            verifyNoInteractions(emailSenderService);
-        }
+        verify(smsSenderService).sendSms("+919000000000", "Alert: Message");
+        verifyNoInteractions(emailSenderService);
     }
 
     @Test
     void testDispatchSms_ProviderDisabled() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            mocked.when(ProviderConfigValidator::isSmsEnabled).thenReturn(false);
+        ProviderConfigValidator.setSmsEnabled(false);
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.SMS);
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.SMS);
 
-            assertThrows(org.notification.exception.ProviderDisabledException.class, () -> dispatcher.dispatch(n));
-            verifyNoInteractions(smsSenderService);
-        }
+        assertThrows(ProviderDisabledException.class, () -> dispatcher.dispatch(n));
+        verifyNoInteractions(smsSenderService);
     }
 
     @Test
-    void testDispatchSms_MissingPhone() {
-        try (MockedStatic<ProviderConfigValidator> mocked = mockStatic(ProviderConfigValidator.class)) {
-            stubProvidersEnabled(mocked);
+    void testDispatchSms_MissingPhone_ThrowsPermanentFailure() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.SMS);
+        n.setRecipientPhone(null);
 
-            Notification n = new Notification();
-            n.setChannel(NotificationChannel.SMS);
-            n.setRecipientPhone(null);
-
-            assertThrows(org.notification.exception.PermanentFailureException.class, () -> dispatcher.dispatch(n));
-            verifyNoInteractions(smsSenderService);
-        }
+        assertThrows(PermanentFailureException.class, () -> dispatcher.dispatch(n));
+        verifyNoInteractions(smsSenderService);
     }
 
-    // ── in-app dispatch ────────────────────────────────────────────────────────
+    @Test
+    void testDispatchSms_BlankPhone_ThrowsPermanentFailure() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.SMS);
+        n.setRecipientPhone("  ");
+
+        assertThrows(PermanentFailureException.class, () -> dispatcher.dispatch(n));
+        verifyNoInteractions(smsSenderService);
+    }
+
+    // ── in-app ─────────────────────────────────────────────────────────────────
 
     @Test
-    void testDispatchInApp() {
+    void testDispatchInApp_NoExternalCalls() {
         Notification n = new Notification();
         n.setChannel(NotificationChannel.IN_APP);
 
-        dispatcher.dispatch(n);
+        assertDoesNotThrow(() -> dispatcher.dispatch(n));
 
         verifyNoInteractions(emailSenderService);
         verifyNoInteractions(smsSenderService);

@@ -6,9 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import jakarta.annotation.PostConstruct;
 
 /**
- * Validates provider configuration at startup and exposes enabled flags via
- * static accessor methods backed by instance state to satisfy SonarQube's
- * "make enclosing method static or remove this set" rule.
+ * Validates provider configuration at startup and exposes thread-safe
+ * enabled flags through static accessors.
+ * The flags are set once during {@code @PostConstruct} and are read-only thereafter.
  */
 @Slf4j
 @Configuration
@@ -32,33 +32,39 @@ public class ProviderConfigValidator {
     @Value("${twilio.phone-number:#{null}}")
     private String twilioPhoneNumber;
 
-    // Holder carries instance state; static accessors read from it after Spring wires it.
-    private static ProviderConfigValidator instance;
-
-    private boolean emailEnabled = true;
-    private boolean smsEnabled = true;
+    private static volatile boolean emailEnabled = true;
+    private static volatile boolean smsEnabled = true;
 
     public static boolean isEmailEnabled() {
-        return instance == null || instance.emailEnabled;
+        return emailEnabled;
     }
 
     public static boolean isSmsEnabled() {
-        return instance == null || instance.smsEnabled;
+        return smsEnabled;
+    }
+
+    /** Package-visible for testing only. */
+    static void setEmailEnabled(boolean value) {
+        emailEnabled = value;
+    }
+
+    /** Package-visible for testing only. */
+    static void setSmsEnabled(boolean value) {
+        smsEnabled = value;
     }
 
     @PostConstruct
     public void validate() {
-        instance = this;
+        setEmailEnabled(!isBlankAny(mailHost, mailUsername, mailPassword));
+        setSmsEnabled(!isBlankAny(twilioAccountSid, twilioAuthToken, twilioPhoneNumber));
 
-        if (isBlankAny(mailHost, mailUsername, mailPassword)) {
-            emailEnabled = false;
+        if (!emailEnabled) {
             log.warn("EMAIL_PROVIDER_DISABLED: Email configuration (host, username, or password) is missing.");
         } else {
             log.info("Email provider is configured successfully.");
         }
 
-        if (isBlankAny(twilioAccountSid, twilioAuthToken, twilioPhoneNumber)) {
-            smsEnabled = false;
+        if (!smsEnabled) {
             log.warn("SMS_PROVIDER_DISABLED: Twilio configuration (accountSid, authToken, or phoneNumber) is missing.");
         } else {
             log.info("SMS provider is configured successfully.");
