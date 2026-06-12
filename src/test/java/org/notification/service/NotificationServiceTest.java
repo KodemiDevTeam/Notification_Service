@@ -574,5 +574,119 @@ class NotificationServiceTest {
 
         verify(repository, times(2)).delete(any());
     }
+
+    @Test
+    void testMarkAsRead_AlreadyRead_DoesNotSave() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setRead(true);
+        when(repository.findById("n1")).thenReturn(n);
+
+        notificationService.markAsRead("n1");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void testMarkAsRead_NotFound_DoesNotSave() {
+        when(repository.findById("n1")).thenReturn(null);
+
+        notificationService.markAsRead("n1");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void testRescheduleBatch_NullScheduledAt_DoesNothing() {
+        notificationService.rescheduleBatch("batch1", null);
+        verify(repository, never()).findByBatchId(any());
+    }
+
+    @Test
+    void testBroadcast_NullTargetList_ReturnsZero() {
+        BroadcastNotificationRequest req = new BroadcastNotificationRequest();
+        req.setTargetRole("LEARNER");
+        req.setSendMode(SendMode.SEND_NOW);
+        req.setChannels(List.of(NotificationChannel.IN_APP));
+        req.setType(NotificationType.GENERAL);
+
+        when(userClient.getUsersForNotification("LEARNER")).thenReturn(null);
+
+        BroadcastNotificationResponse response = notificationService.broadcast(req);
+
+        assertEquals(0, response.getTotalUsers());
+        assertEquals(0, response.getTotalNotificationsCreated());
+    }
+
+    @Test
+    void testBroadcast_NullChannels_DoesNotSave() {
+        BroadcastNotificationRequest req = new BroadcastNotificationRequest();
+        req.setTargetRole("LEARNER");
+        req.setSendMode(SendMode.SEND_NOW);
+        req.setChannels(null);
+        req.setType(NotificationType.GENERAL);
+
+        UserNotificationTargetDTO target = new UserNotificationTargetDTO();
+        target.setUserId("u1");
+        when(userClient.getUsersForNotification("LEARNER")).thenReturn(List.of(target));
+
+        BroadcastNotificationResponse response = notificationService.broadcast(req);
+
+        assertEquals(0, response.getTotalNotificationsCreated());
+        verify(repository, never()).saveIdempotent(any());
+    }
+
+    @Test
+    void testBroadcast_DefaultSendMode_ReturnsZero() {
+        BroadcastNotificationRequest req = new BroadcastNotificationRequest();
+        req.setTargetRole("LEARNER");
+        req.setSendMode(SendMode.SCHEDULED);
+        req.setChannels(List.of(NotificationChannel.IN_APP));
+        req.setType(NotificationType.GENERAL);
+        req.setScheduledAt(null); // falls back to now
+
+        UserNotificationTargetDTO target = new UserNotificationTargetDTO();
+        target.setUserId("u1");
+        when(userClient.getUsersForNotification("LEARNER")).thenReturn(List.of(target));
+        when(repository.saveIdempotent(any())).thenReturn(true);
+
+        BroadcastNotificationResponse response = notificationService.broadcast(req);
+        assertEquals(1, response.getTotalNotificationsCreated());
+    }
+
+    @Test
+    void testSendInternal_WithExistingEmail_DoesNotFetchContact() {
+        NotificationRequest req = new NotificationRequest();
+        req.setUserId("u1");
+        req.setType(NotificationType.GENERAL);
+        req.setChannels(List.of("EMAIL"));
+        req.setEmail("already@set.com");
+        req.setTitle("T");
+        req.setMessage("M");
+
+        when(repository.saveIdempotent(any())).thenReturn(true);
+
+        notificationService.sendInternal(req);
+
+        verify(userClient, never()).getUserContact(any());
+        verify(repository, times(1)).saveIdempotent(any());
+    }
+
+    @Test
+    void testBroadcast_TargetWithNullUserId_Skipped() {
+        BroadcastNotificationRequest req = new BroadcastNotificationRequest();
+        req.setTargetRole("LEARNER");
+        req.setSendMode(SendMode.SEND_NOW);
+        req.setChannels(List.of(NotificationChannel.IN_APP));
+        req.setType(NotificationType.GENERAL);
+
+        UserNotificationTargetDTO target = new UserNotificationTargetDTO();
+        target.setUserId(null); // null userId — should be filtered out
+
+        when(userClient.getUsersForNotification("LEARNER")).thenReturn(List.of(target));
+
+        BroadcastNotificationResponse response = notificationService.broadcast(req);
+        assertEquals(0, response.getTotalUsers());
+    }
 }
 

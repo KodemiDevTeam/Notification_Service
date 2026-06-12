@@ -105,7 +105,7 @@ public class NotificationScheduler {
             log.error("Permanent failure sending notification {}", notification.getNotificationId(), e);
             markFailed(notification, e.getMessage());
             scheduleNextRecurrenceIfApplicable(notification);
-        } catch (Throwable e) {
+        } catch (Exception e) {
             log.error("Temporary failure sending notification {}", notification.getNotificationId(), e);
             handleTemporaryFailure(notification, e.getMessage());
         }

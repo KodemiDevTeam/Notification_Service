@@ -235,6 +235,51 @@ class NotificationSchedulerTest {
     }
 
     @Test
+    void testScheduleNextRecurrence_CustomRecurring() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+        n.setSendMode(SendMode.CUSTOM_RECURRING);
+        n.setScheduledAt(1716435000000L);
+        n.setBatchId("batch1");
+        n.setUserId("user1");
+        n.setChannel(org.notification.model.enums.NotificationChannel.SMS);
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+        when(repository.acquireLock("n1", NotificationStatus.PENDING, NotificationStatus.PROCESSING)).thenReturn(true);
+        when(repository.existsByRecurrenceKey(anyString())).thenReturn(false);
+
+        scheduler.processPendingNotifications();
+
+        verify(dynamoDBMapper, times(1)).save(notificationCaptor.capture());
+        assertEquals(SendMode.CUSTOM_RECURRING, notificationCaptor.getValue().getSendMode());
+    }
+
+    @Test
+    void testScheduleNextRecurrence_NullRecurrenceSlot_UsesDefault() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+        n.setSendMode(SendMode.DAILY_EVENING);
+        n.setScheduledAt(1716435000000L);
+        n.setBatchId("batch1");
+        n.setUserId("user1");
+        n.setChannel(org.notification.model.enums.NotificationChannel.IN_APP);
+        n.setRecurrenceSlot(null); // null slot — should default to "DAILY"
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+        when(repository.acquireLock("n1", NotificationStatus.PENDING, NotificationStatus.PROCESSING)).thenReturn(true);
+        when(repository.existsByRecurrenceKey(anyString())).thenReturn(false);
+
+        scheduler.processPendingNotifications();
+
+        verify(dynamoDBMapper, times(1)).save(notificationCaptor.capture());
+        assertEquals("DAILY", notificationCaptor.getValue().getRecurrenceSlot());
+    }
+
+    @Test
     void testProcessPendingNotifications_Sorting() {
         Notification n1 = new Notification();
         n1.setNotificationId("n1");

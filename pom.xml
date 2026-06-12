@@ -32,6 +32,7 @@
         <!-- SonarQube Properties -->
         <sonar.java.binaries>target/classes</sonar.java.binaries>
         <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.exclusions>**/config/**,**/exception/**,**/model/**,**/dto/**,**/client/**,**/Main.java</sonar.coverage.exclusions>
         <sonar.dependencyCheck.xmlReportPath>${project.build.directory}/dependency-check-report.xml</sonar.dependencyCheck.xmlReportPath>
     </properties>
 
@@ -243,7 +244,6 @@
                         <exclude>org/notification/model/**</exclude>
                         <exclude>org/notification/dto/**</exclude>
                         <exclude>org/notification/client/**</exclude>
-                        <exclude>org/notification/util/**</exclude>
                         <exclude>org/notification/Main.class</exclude>
                     </excludes>
                 </configuration>

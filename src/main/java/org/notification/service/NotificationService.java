@@ -149,8 +149,7 @@ public class NotificationService {
             case SEND_NOW:
                 saveRecord(batchId, userId, email, phone, channel, req, now, null, null, null);
                 return 1;
-            case SCHEDULED:
-            case CUSTOM_RECURRING:
+            case SCHEDULED, CUSTOM_RECURRING:
                 saveRecord(batchId, userId, email, phone, channel, req,
                         parseEpoch(req.getScheduledAt(), now, zoneId), null, null, null);
                 return 1;
