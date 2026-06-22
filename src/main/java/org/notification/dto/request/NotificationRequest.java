@@ -23,7 +23,7 @@ public class NotificationRequest {
     
     private NotificationChannel channel;
     
-    private java.util.List<String> channels;
+    private java.util.List<NotificationChannel> channels;
 
     private NotificationPriority priority;
 
@@ -31,4 +31,6 @@ public class NotificationRequest {
     private String phoneNumber;
     private String redirectUrl;
     private String referenceId;
+    private String referenceType;
+    private java.util.Map<String, Object> metadata;
 }

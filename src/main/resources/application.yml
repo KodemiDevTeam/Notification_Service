@@ -1,5 +1,5 @@
 server:
-  port: 8087
+  port: ${SERVER_PORT:8087}
 
 spring:
   application:
@@ -14,27 +14,26 @@ spring:
             connectTimeout: 3000
             readTimeout: 5000
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${SPRING_MAIL_USERNAME:}
-    password: ${SPRING_MAIL_PASSWORD:}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           ssl:
-            trust: smtp.gmail.com
+            trust: ${MAIL_SMTP_SSL_TRUST:smtp.gmail.com}
           auth: true
           starttls:
             enable: true
 
 aws:
-  region: ${AWS_REGION:eu-north-1}
-
+  region: ${AWS_REGION}
 
 twilio:
-  account-sid: ${TWILIO_ACCOUNT_SID:}
-  auth-token: ${TWILIO_AUTH_TOKEN:}
-  phone-number: ${TWILIO_PHONE_NUMBER:}
+  account-sid: ${TWILIO_ACCOUNT_SID}
+  auth-token: ${TWILIO_AUTH_TOKEN}
+  phone-number: ${TWILIO_PHONE_NUMBER}
 
 notification:
   scheduler:
@@ -51,7 +50,7 @@ notification:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL}
   instance:
     prefer-ip-address: true
 
@@ -73,5 +72,3 @@ resilience4j:
     instances:
       user-service:
         baseConfig: default
-
-

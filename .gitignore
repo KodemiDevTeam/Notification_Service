@@ -38,3 +38,5 @@ build/
 ### Mac OS ###
 .DS_Store
 .env
+application-local.yml
+application-local.yaml

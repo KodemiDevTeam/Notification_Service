@@ -310,18 +310,18 @@ public class NotificationService {
     public void sendInternal(NotificationRequest req) {
         if (req.getChannels() == null || req.getChannels().isEmpty()) {
             if (req.getChannel() != null) {
-                req.setChannels(java.util.Collections.singletonList(req.getChannel().name()));
+                req.setChannels(java.util.Collections.singletonList(req.getChannel()));
             } else {
-                req.setChannels(java.util.Collections.singletonList(NotificationChannel.IN_APP.name()));
+                req.setChannels(java.util.Collections.singletonList(NotificationChannel.IN_APP));
             }
         }
 
         boolean fetchContact = false;
-        for (String c : req.getChannels()) {
-            if ("EMAIL".equals(c) && (req.getEmail() == null || req.getEmail().isBlank())) {
+        for (NotificationChannel c : req.getChannels()) {
+            if (c == NotificationChannel.EMAIL && (req.getEmail() == null || req.getEmail().isBlank())) {
                 fetchContact = true;
             }
-            if ("SMS".equals(c) && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
+            if (c == NotificationChannel.SMS && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
                 fetchContact = true;
             }
         }
@@ -342,9 +342,8 @@ public class NotificationService {
             }
         }
 
-        for (String cStr : req.getChannels()) {
+        for (NotificationChannel channel : req.getChannels()) {
             try {
-                NotificationChannel channel = NotificationChannel.valueOf(cStr);
                 boolean skip = false;
                 
                 if (channel == NotificationChannel.EMAIL) {
@@ -375,7 +374,7 @@ public class NotificationService {
                     }
                 }
             } catch (Exception e) {
-                log.error("Failed to process channel {} for user {}", cStr, req.getUserId(), e);
+                log.error("Failed to process channel {} for user {}", channel, req.getUserId(), e);
             }
         }
     }
