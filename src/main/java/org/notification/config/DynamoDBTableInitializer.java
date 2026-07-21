@@ -21,7 +21,9 @@ public class DynamoDBTableInitializer {
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         createTableIfMissing();
-        waitForTableAndIndexesToBecomeActive();
+        createDeviceTokenTableIfMissing();
+        waitForTableAndIndexesToBecomeActive(Notification.TABLE_NAME);
+        waitForTableAndIndexesToBecomeActive(org.notification.model.DeviceToken.TABLE_NAME);
     }
 
     private void createTableIfMissing() {
@@ -88,16 +90,49 @@ public class DynamoDBTableInitializer {
         }
     }
 
-    private void waitForTableAndIndexesToBecomeActive() {
+    private void createDeviceTokenTableIfMissing() {
+        try {
+            DescribeTableResult result = amazonDynamoDB.describeTable(org.notification.model.DeviceToken.TABLE_NAME);
+            log.info("Table {} already exists. Status: {}", org.notification.model.DeviceToken.TABLE_NAME, result.getTable().getTableStatus());
+            
+        } catch (ResourceNotFoundException e) {
+            log.warn("Table {} not found. Creating it now...", org.notification.model.DeviceToken.TABLE_NAME);
+            
+            CreateTableRequest request = new CreateTableRequest()
+                    .withTableName(org.notification.model.DeviceToken.TABLE_NAME)
+                    .withAttributeDefinitions(
+                            new AttributeDefinition("token", ScalarAttributeType.S),
+                            new AttributeDefinition("userId", ScalarAttributeType.S)
+                    )
+                    .withKeySchema(
+                            new KeySchemaElement("token", KeyType.HASH)
+                    )
+                    .withGlobalSecondaryIndexes(
+                            new GlobalSecondaryIndex()
+                                    .withIndexName(org.notification.model.DeviceToken.USER_INDEX)
+                                    .withKeySchema(
+                                            new KeySchemaElement("userId", KeyType.HASH)
+                                    )
+                                    .withProjection(new Projection().withProjectionType(ProjectionType.ALL))
+                                    .withProvisionedThroughput(new ProvisionedThroughput(5L, 5L))
+                    )
+                    .withProvisionedThroughput(new ProvisionedThroughput(5L, 5L));
+
+            amazonDynamoDB.createTable(request);
+            log.info("Creation request sent for table: {}", org.notification.model.DeviceToken.TABLE_NAME);
+        }
+    }
+
+    private void waitForTableAndIndexesToBecomeActive(String tableName) {
         boolean active = false;
         int maxRetries = 20;
         int retries = 0;
 
-        log.info("Waiting for table {} and its GSIs to become ACTIVE...", Notification.TABLE_NAME);
+        log.info("Waiting for table {} and its GSIs to become ACTIVE...", tableName);
 
         while (!active && retries < maxRetries) {
             try {
-                DescribeTableResult result = amazonDynamoDB.describeTable(Notification.TABLE_NAME);
+                DescribeTableResult result = amazonDynamoDB.describeTable(tableName);
                 String tableStatus = result.getTable().getTableStatus();
 
                 if (TableStatus.ACTIVE.toString().equals(tableStatus)) {
@@ -113,15 +148,15 @@ public class DynamoDBTableInitializer {
                     }
 
                     if (allIndexesActive) {
-                        log.info("Table {} and all its GSIs are completely ACTIVE and ready.", Notification.TABLE_NAME);
+                        log.info("Table {} and all its GSIs are completely ACTIVE and ready.", tableName);
                         active = true;
                         continue;
                     }
                 } else {
-                    log.info("Table {} is currently {}. Waiting...", Notification.TABLE_NAME, tableStatus);
+                    log.info("Table {} is currently {}. Waiting...", tableName, tableStatus);
                 }
             } catch (ResourceNotFoundException e) {
-                log.info("Table {} not yet visible in AWS...", Notification.TABLE_NAME);
+                log.info("Table {} not yet visible in AWS...", tableName);
             }
 
             retries++;
@@ -134,7 +169,7 @@ public class DynamoDBTableInitializer {
         }
 
         if (!active) {
-            log.error("Timed out waiting for table {} to become active.", Notification.TABLE_NAME);
+            log.error("Timed out waiting for table {} to become active.", tableName);
         }
     }
 }

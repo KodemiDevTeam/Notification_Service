@@ -1,200 +1,278 @@
 {
-	"info": {
-		"_postman_id": "c1f7b889-4e78-4a5f-9e8a-e9b2a75d5b7a",
-		"name": "Notification Service V3 - Production Ready",
-		"description": "Comprehensive Postman collection for the production-ready Notification Service V3. Features strict deduplication, atomic database locking, and advanced scheduling capabilities.",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"item": [
-		{
-			"name": "Health Check",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/notifications/health",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"notifications",
-						"health"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Broadcast - All Channels (Deduplicated)",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"title\": \"Major Platform Update!\",\n    \"message\": \"We just launched the new features. Log in to explore!\",\n    \"type\": \"SYSTEM_ALERT\",\n    \"priority\": \"HIGH\",\n    \"channels\": [\"EMAIL\", \"SMS\", \"IN_APP\"],\n    \"targetRole\": \"LEARNER\",\n    \"sendMode\": \"SEND_NOW\",\n    \"maxRetries\": 3\n}"
-				},
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/notifications/broadcast",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"notifications",
-						"broadcast"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Broadcast - Daily Morning Scheduler",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"title\": \"Daily Learning Streak\",\n    \"message\": \"Good morning! Don't forget to complete your lesson for today.\",\n    \"type\": \"PROMOTIONAL\",\n    \"priority\": \"NORMAL\",\n    \"channels\": [\"IN_APP\"],\n    \"targetRole\": \"LEARNER\",\n    \"sendMode\": \"DAILY_MORNING\",\n    \"morningTime\": \"09:00\",\n    \"timezone\": \"Asia/Kolkata\"\n}"
-				},
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/notifications/broadcast",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"notifications",
-						"broadcast"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Send Direct (Immediate)",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"userId\": \"{{userId}}\",\n    \"title\": \"Direct Message\",\n    \"message\": \"This is a direct message.\",\n    \"type\": \"GENERAL\",\n    \"channel\": \"IN_APP\",\n    \"priority\": \"NORMAL\"\n}"
-				},
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/notifications/in-app",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"notifications",
-						"in-app"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get User Notifications",
-			"request": {
-				"method": "GET",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/notifications/user/{{userId}}",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"notifications",
-						"user",
-						"{{userId}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Cancel Broadcast Batch",
-			"request": {
-				"method": "PATCH",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/notifications/broadcast/{{batchId}}/cancel",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"notifications",
-						"broadcast",
-						"{{batchId}}",
-						"cancel"
-					]
-				}
-			},
-			"response": []
-		}
-	],
-	"variable": [
-		{
-			"key": "baseUrl",
-			"value": "http://localhost:8080"
-		},
-		{
-			"key": "token",
-			"value": "your_jwt_token_here"
-		},
-		{
-			"key": "userId",
-			"value": "sample_user_id"
-		},
-		{
-			"key": "batchId",
-			"value": "sample_batch_id"
-		}
-	]
+  "info": {
+    "name": "KodeMI Notification Service API",
+    "description": "Comprehensive Postman collection for the production-ready KodeMI Notification Service. Features real-time SSE event streaming, mobile FCM token registration/deregistration, unread counts, and marking read/all-read.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Web SSE Stream Connection",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/stream/{{userId}}?token={{token}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "stream",
+            "{{userId}}"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        },
+        "description": "Establishes a Server-Sent Events (SSE) connection. In Postman, you can test this using the SSE connection panel. The token must be sent in the query parameter."
+      },
+      "response": []
+    },
+    {
+      "name": "Register Mobile FCM Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"token\": \"fcm_token_from_device_example_12345\",\n    \"platform\": \"ANDROID\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/device-token/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "device-token",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Deregister Mobile FCM Token",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"token\": \"fcm_token_from_device_example_12345\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/device-token",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "device-token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get My Notifications",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "me"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get My Unread Count",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/me/unread-count",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "me",
+            "unread-count"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Mark One Read",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/read",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "{{notificationId}}",
+            "read"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Mark All Read",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/me/read-all",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "me",
+            "read-all"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Send Direct (Immediate)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"userId\": \"{{userId}}\",\n    \"title\": \"Direct Message Example\",\n    \"message\": \"This is an immediate direct in-app notification.\",\n    \"type\": \"GENERAL\",\n    \"channel\": \"IN_APP\",\n    \"priority\": \"NORMAL\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/in-app",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "in-app"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://creepier-rachell-hooplike.ngrok-free.dev"
+    },
+    {
+      "key": "token",
+      "value": "paste_jwt_token_here"
+    },
+    {
+      "key": "userId",
+      "value": "sample_user_id"
+    },
+    {
+      "key": "notificationId",
+      "value": "sample_notification_id"
+    }
+  ]
 }

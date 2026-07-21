@@ -11,11 +11,17 @@ public class NotificationDispatcher {
 
     private final EmailSenderService emailService;
     private final SmsSenderService smsService;
+    private final FcmPushService fcmPushService;
+    private final SseConnectionManager sseConnectionManager;
 
     public NotificationDispatcher(EmailSenderService emailService,
-                                  SmsSenderService smsService) {
+                                  SmsSenderService smsService,
+                                  FcmPushService fcmPushService,
+                                  SseConnectionManager sseConnectionManager) {
         this.emailService = emailService;
         this.smsService = smsService;
+        this.fcmPushService = fcmPushService;
+        this.sseConnectionManager = sseConnectionManager;
     }
 
     public void dispatch(Notification notification) {
@@ -46,7 +52,27 @@ public class NotificationDispatcher {
                 smsService.sendSms(notification.getRecipientPhone(), notification.getTitle() + ": " + notification.getMessage());
                 break;
             case IN_APP:
-                // No external sending. Notification remains in DB with status SENT.
+                // 1. Send via SSE to Web browser (if connected)
+                try {
+                    org.notification.dto.response.NotificationResponse payload =
+                            org.notification.dto.response.NotificationResponse.fromEntity(notification);
+                    sseConnectionManager.sendNotification(notification.getUserId(), payload);
+                } catch (Exception e) {
+                    log.warn("Failed to stream notification via SSE to user {}: {}", notification.getUserId(), e.getMessage());
+                }
+
+                // 2. Send via FCM to Mobile devices (if tokens registered)
+                try {
+                    fcmPushService.sendPushNotification(
+                            notification.getUserId(),
+                            notification.getTitle(),
+                            notification.getMessage(),
+                            notification.getType() != null ? notification.getType().name() : null,
+                            notification.getReferenceId()
+                    );
+                } catch (Exception e) {
+                    log.warn("Failed to push notification via FCM to user {}: {}", notification.getUserId(), e.getMessage());
+                }
                 break;
             default:
                 throw new PermanentFailureException("Unknown channel: " + notification.getChannel());

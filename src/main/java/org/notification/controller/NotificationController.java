@@ -7,6 +7,7 @@ import org.notification.dto.request.ScheduledNotificationRequest;
 import org.notification.dto.response.BroadcastNotificationResponse;
 import org.notification.dto.response.NotificationResponse;
 import org.notification.service.NotificationService;
+import org.notification.util.JwtUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +16,10 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 
-import org.notification.util.JwtUtil;
+import org.notification.service.SseConnectionManager;
+import org.notification.repository.DeviceTokenRepository;
+import org.notification.model.DeviceToken;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1/notifications")
@@ -23,10 +27,16 @@ public class NotificationController {
 
     private final NotificationService service;
     private final JwtUtil jwtUtil;
+    private final SseConnectionManager sseConnectionManager;
+    private final DeviceTokenRepository deviceTokenRepository;
 
-    public NotificationController(NotificationService service, JwtUtil jwtUtil) {
+    public NotificationController(NotificationService service, JwtUtil jwtUtil,
+                                  SseConnectionManager sseConnectionManager,
+                                  DeviceTokenRepository deviceTokenRepository) {
         this.service = service;
         this.jwtUtil = jwtUtil;
+        this.sseConnectionManager = sseConnectionManager;
+        this.deviceTokenRepository = deviceTokenRepository;
     }
 
     @Value("${internal.service.key:default-secret}")
@@ -198,5 +208,95 @@ public class NotificationController {
     public ResponseEntity<Map<String, String>> clearUserNotifications(@PathVariable String userId) {
         service.clearUserNotifications(userId);
         return ResponseEntity.ok(Map.of("message", "All notifications cleared for user."));
+    }
+
+    // ─── Real-Time Stream (SSE) ───────────────────────────────────────────────
+    @GetMapping(value = "/stream/{userId}", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> streamNotifications(
+            @PathVariable String userId,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "token", required = false) String queryToken) {
+            
+        String token = authHeader != null ? authHeader : queryToken;
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        String tokenUserId = jwtUtil.extractUserId(token);
+        if (tokenUserId == null || !tokenUserId.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        
+        return ResponseEntity.ok(sseConnectionManager.subscribe(userId));
+    }
+
+    // ─── FCM Device Tokens (Mobile Push) ──────────────────────────────────────
+    @PostMapping("/device-token/register")
+    public ResponseEntity<Map<String, String>> registerDeviceToken(
+            @RequestHeader("Authorization") String tokenHeader,
+            @RequestBody Map<String, String> request) {
+            
+        String token = tokenHeader;
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        
+        String userId = jwtUtil.extractUserId(token);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        String deviceToken = request.get("token");
+        String platform = request.get("platform");
+        
+        if (deviceToken == null || deviceToken.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Device token is required"));
+        }
+        
+        DeviceToken existing = deviceTokenRepository.findByToken(deviceToken);
+        if (existing == null) {
+            existing = new DeviceToken();
+            existing.setToken(deviceToken);
+        }
+        
+        existing.setUserId(userId);
+        existing.setPlatform(platform != null ? platform : "ANDROID");
+        existing.setCreatedAt(System.currentTimeMillis());
+        
+        deviceTokenRepository.save(existing);
+        return ResponseEntity.ok(Map.of("message", "Device token registered successfully."));
+    }
+
+    @DeleteMapping("/device-token")
+    public ResponseEntity<Map<String, String>> deregisterDeviceToken(
+            @RequestHeader("Authorization") String tokenHeader,
+            @RequestBody Map<String, String> request) {
+            
+        String token = tokenHeader;
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        
+        String userId = jwtUtil.extractUserId(token);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        String deviceToken = request.get("token");
+        if (deviceToken == null || deviceToken.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Device token is required"));
+        }
+        
+        DeviceToken existing = deviceTokenRepository.findByToken(deviceToken);
+        if (existing != null && userId.equals(existing.getUserId())) {
+            deviceTokenRepository.delete(existing);
+            return ResponseEntity.ok(Map.of("message", "Device token deregistered successfully."));
+        }
+        
+        return ResponseEntity.ok(Map.of("message", "No matching device token found."));
     }
 }
