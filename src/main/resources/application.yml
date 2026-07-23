@@ -1,13 +1,13 @@
 server:
-  port: ${SERVER_PORT:8087}
+  port: ${SERVER_PORT}
 
 spring:
   application:
     name: notification-service
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
   cloud:
     openfeign:
       circuitbreaker:
@@ -18,15 +18,15 @@ spring:
             connectTimeout: 3000
             readTimeout: 5000
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:${SPRING_MAIL_USERNAME:${mail_username:}}}
-    password: ${MAIL_PASSWORD:${SPRING_MAIL_PASSWORD:${mail_password:}}}
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           ssl:
-            trust: ${MAIL_SMTP_SSL_TRUST:smtp.gmail.com}
+            trust: ${MAIL_SMTP_SSL_TRUST}
           auth: true
           starttls:
             enable: true

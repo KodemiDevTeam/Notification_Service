@@ -39,4 +39,5 @@ build/
 .DS_Store
 .env
 application-local.yml
-application-local.yaml
+application-local.yaml
+env.txt
