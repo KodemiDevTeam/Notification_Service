@@ -1,5 +1,6 @@
 package org.notification.service;
 
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
@@ -21,6 +22,11 @@ public class FcmPushService {
     }
 
     public void sendPushNotification(String userId, String title, String body, String type, String referenceId) {
+        if (FirebaseApp.getApps().isEmpty()) {
+            log.warn("Firebase is not initialized. Skipping push notification for userId: {}", userId);
+            return;
+        }
+
         List<DeviceToken> deviceTokens = deviceTokenRepository.findByUserId(userId);
         if (deviceTokens == null || deviceTokens.isEmpty()) {
             log.info("No registered mobile device tokens found for userId: {}", userId);
