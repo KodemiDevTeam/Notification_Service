@@ -21,7 +21,7 @@ public class UserClientFallbackFactory implements FallbackFactory<UserClient> {
             }
 
             @Override
-            public UserNotificationTargetDTO getUserContact(String userId) {
+            public UserNotificationTargetDTO getUserContact(String userId, String serviceKey) {
                 log.error("Failed to retrieve user contact details. UserId: {}. Fallback fail-silent returning null. Error: {}", userId, cause.getMessage(), cause);
                 return null;
             }

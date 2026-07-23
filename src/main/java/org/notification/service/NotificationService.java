@@ -49,6 +49,9 @@ public class NotificationService {
     @Value("${notification.retry.max-retries:3}")
     private int defaultMaxRetries;
 
+    @Value("${internal.service.key:default-secret}")
+    private String internalServiceKey;
+
     public NotificationService(NotificationRepository repository, UserClient userClient) {
         this.repository = repository;
         this.userClient = userClient;
@@ -328,7 +331,7 @@ public class NotificationService {
 
         if (fetchContact) {
             try {
-                UserNotificationTargetDTO contact = userClient.getUserContact(req.getUserId());
+                UserNotificationTargetDTO contact = userClient.getUserContact(req.getUserId(), internalServiceKey);
                 if (contact != null) {
                     if (req.getEmail() == null || req.getEmail().isBlank()) {
                         req.setEmail(contact.getEmail());

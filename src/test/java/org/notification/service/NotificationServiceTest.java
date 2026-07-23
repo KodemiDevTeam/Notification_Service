@@ -290,7 +290,7 @@ class NotificationServiceTest {
         contact.setEmail("fetched@example.com");
         contact.setPhoneNumber("+918888888888");
 
-        when(userClient.getUserContact("u1")).thenReturn(contact);
+        when(userClient.getUserContact(eq("u1"), any())).thenReturn(contact);
         when(repository.saveIdempotent(any())).thenReturn(true);
 
         notificationService.sendInternal(req);
@@ -309,7 +309,7 @@ class NotificationServiceTest {
         req.setTitle("T");
         req.setMessage("M");
 
-        when(userClient.getUserContact("u1")).thenThrow(new RuntimeException("API error"));
+        when(userClient.getUserContact(eq("u1"), any())).thenThrow(new RuntimeException("API error"));
 
         notificationService.sendInternal(req);
 
@@ -327,7 +327,7 @@ class NotificationServiceTest {
         req.setMessage("M");
 
         // No contact found or returned
-        when(userClient.getUserContact("u1")).thenReturn(null);
+        when(userClient.getUserContact(eq("u1"), any())).thenReturn(null);
         when(repository.saveIdempotent(any())).thenReturn(true);
 
         notificationService.sendInternal(req);
