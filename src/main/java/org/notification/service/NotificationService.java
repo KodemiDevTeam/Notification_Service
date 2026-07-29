@@ -19,6 +19,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -27,8 +28,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Service
@@ -60,7 +59,7 @@ public class NotificationService {
     public BroadcastNotificationResponse broadcast(BroadcastNotificationRequest req) {
         log.info("Starting broadcast for role: {}, sendMode: {}", req.getTargetRole(), req.getSendMode());
         List<UserNotificationTargetDTO> rawTargets = userClient.getUsersForNotification(req.getTargetRole());
-        
+
         // Deduplicate targets by userId to prevent identical user objects from spamming
         List<UserNotificationTargetDTO> targets = new java.util.ArrayList<>();
         if (rawTargets != null) {
@@ -74,8 +73,11 @@ public class NotificationService {
         }
 
         int totalUsers = targets.size();
-        int inAppCreated = 0, emailCreated = 0, smsCreated = 0;
-        int skippedEmailMissing = 0, skippedPhoneMissing = 0;
+        int inAppCreated = 0;
+        int emailCreated = 0;
+        int smsCreated = 0;
+        int skippedEmailMissing = 0;
+        int skippedPhoneMissing = 0;
         String batchId = UUID.randomUUID().toString();
 
         // Track emails and phones sent in this batch to prevent duplicates
@@ -112,7 +114,7 @@ public class NotificationService {
                         }
 
                         int created = createRecordsForMode(batchId, target.getUserId(), email, phone, channel, req);
-                        
+
                         if (created > 0) {
                             if (channel == NotificationChannel.IN_APP) inAppCreated += created;
                             if (channel == NotificationChannel.EMAIL) emailCreated += created;
@@ -210,11 +212,11 @@ public class NotificationService {
         }
     }
 
-    private Notification buildNotification(String userId, String email, String phone, String title, String message, 
-                                           org.notification.model.enums.NotificationType type, 
-                                           org.notification.model.enums.NotificationChannel channel, 
-                                           String redirectUrl, String referenceId, 
-                                           org.notification.model.enums.NotificationPriority priority, 
+    private Notification buildNotification(String userId, String email, String phone, String title, String message,
+                                           org.notification.model.enums.NotificationType type,
+                                           org.notification.model.enums.NotificationChannel channel,
+                                           String redirectUrl, String referenceId,
+                                           org.notification.model.enums.NotificationPriority priority,
                                            String batchId, org.notification.model.enums.SendMode sendMode, long scheduledAt,
                                            Integer maxRetries, String recurrenceKey, String recurrenceDate, String recurrenceSlot) {
         Notification n = new Notification();
@@ -228,7 +230,7 @@ public class NotificationService {
         n.setRedirectUrl(redirectUrl);
         n.setReferenceId(referenceId);
         n.setBatchId(batchId);
-        
+
         String idempotencyKey = type.name() + "_" + userId + "_" + (referenceId != null ? referenceId : "NONE") + "_" + channel.name();
         if (recurrenceKey != null) {
             idempotencyKey += "_" + recurrenceKey;
@@ -237,26 +239,26 @@ public class NotificationService {
         }
         n.setIdempotencyKey(idempotencyKey);
         n.setNotificationId(UUID.nameUUIDFromBytes(idempotencyKey.getBytes(StandardCharsets.UTF_8)).toString());
-        
+
         n.setStatus(NotificationStatus.PENDING);
         n.setSendMode(sendMode);
         n.setPriority(priority != null ? priority : org.notification.model.enums.NotificationPriority.NORMAL);
         n.setScheduledAt(scheduledAt);
-        
+
         long now = System.currentTimeMillis();
         n.setCreatedAt(now);
         n.setUpdatedAt(now);
         n.setExpirationTime((now / 1000) + (30L * 24 * 60 * 60)); // +30 days TTL in seconds
-        
+
         n.setMaxRetries(maxRetries != null ? maxRetries : defaultMaxRetries);
         n.setRetryCount(0);
-        
+
         if (recurrenceKey != null) {
             n.setRecurrenceKey(recurrenceKey);
             n.setRecurrenceDate(recurrenceDate);
             n.setRecurrenceSlot(recurrenceSlot);
         }
-        
+
         return n;
     }
 
@@ -306,81 +308,110 @@ public class NotificationService {
         }
     }
 
+
     @Caching(evict = {
             @CacheEvict(value = "userNotifications", key = "#req.userId"),
             @CacheEvict(value = "unreadCount", key = "#req.userId")
     })
     public void sendInternal(NotificationRequest req) {
-        if (req.getChannels() == null || req.getChannels().isEmpty()) {
-            if (req.getChannel() != null) {
-                req.setChannels(java.util.Collections.singletonList(req.getChannel()));
-            } else {
-                req.setChannels(java.util.Collections.singletonList(NotificationChannel.IN_APP));
-            }
-        }
-
-        boolean fetchContact = false;
-        for (NotificationChannel c : req.getChannels()) {
-            if (c == NotificationChannel.EMAIL && (req.getEmail() == null || req.getEmail().isBlank())) {
-                fetchContact = true;
-            }
-            if (c == NotificationChannel.SMS && (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank())) {
-                fetchContact = true;
-            }
-        }
-
-        if (fetchContact) {
-            try {
-                UserNotificationTargetDTO contact = userClient.getUserContact(req.getUserId(), internalServiceKey);
-                if (contact != null) {
-                    if (req.getEmail() == null || req.getEmail().isBlank()) {
-                        req.setEmail(contact.getEmail());
-                    }
-                    if (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank()) {
-                        req.setPhoneNumber(contact.getPhoneNumber());
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to fetch contact details for user {}: {}", req.getUserId(), e.getMessage());
-            }
-        }
+        ensureChannelsPresent(req);
+        populateContactDetailsIfNeeded(req);
 
         for (NotificationChannel channel : req.getChannels()) {
-            try {
-                boolean skip = false;
-                
-                if (channel == NotificationChannel.EMAIL) {
-                    if (req.getEmail() == null || req.getEmail().isBlank()) {
-                        log.warn("Skipping EMAIL for user {} due to missing email address.", req.getUserId());
-                        skip = true;
-                    }
-                } else if (channel == NotificationChannel.SMS) {
-                    if (req.getPhoneNumber() == null || req.getPhoneNumber().isBlank()) {
-                        log.warn("Skipping SMS for user {} due to missing phone number.", req.getUserId());
-                        skip = true;
-                    }
-                }
-
-                if (!skip) {
-                    Notification n = buildNotification(req.getUserId(), req.getEmail(), req.getPhoneNumber(), req.getTitle(), req.getMessage(), req.getType(), channel, req.getRedirectUrl(), req.getReferenceId(), req.getPriority(), null, SendMode.SEND_NOW, System.currentTimeMillis(), defaultMaxRetries, null, null, null);
-                    
-                    if (repository.saveIdempotent(n)) {
-                        if (channel == NotificationChannel.IN_APP) {
-                            log.info("IN_APP notification created for user {}", req.getUserId());
-                        } else if (channel == NotificationChannel.EMAIL) {
-                            log.info("EMAIL notification queued for user {}", req.getUserId());
-                        } else if (channel == NotificationChannel.SMS) {
-                            log.info("SMS notification queued for user {}", req.getUserId());
-                        }
-                    } else {
-                        log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Failed to process channel {} for user {}", channel, req.getUserId(), e);
-            }
+            processChannelNotification(req, channel);
         }
     }
+
+    private void ensureChannelsPresent(NotificationRequest req) {
+        if (req.getChannels() != null && !req.getChannels().isEmpty()) {
+            return;
+        }
+        NotificationChannel defaultChannel = (req.getChannel() != null)
+                ? req.getChannel()
+                : NotificationChannel.IN_APP;
+        req.setChannels(java.util.Collections.singletonList(defaultChannel));
+    }
+
+    private void populateContactDetailsIfNeeded(NotificationRequest req) {
+        if (!isContactInfoMissingForChannels(req)) {
+            return;
+        }
+
+        try {
+            UserNotificationTargetDTO contact = userClient.getUserContact(req.getUserId(), internalServiceKey);
+            if (contact != null) {
+                if (isBlank(req.getEmail())) {
+                    req.setEmail(contact.getEmail());
+                }
+                if (isBlank(req.getPhoneNumber())) {
+                    req.setPhoneNumber(contact.getPhoneNumber());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch contact details for user {}: {}", req.getUserId(), e.getMessage());
+        }
+    }
+
+    private boolean isContactInfoMissingForChannels(NotificationRequest req) {
+        for (NotificationChannel channel : req.getChannels()) {
+            if (channel == NotificationChannel.EMAIL && isBlank(req.getEmail())) return true;
+            if (channel == NotificationChannel.SMS && isBlank(req.getPhoneNumber())) return true;
+        }
+        return false;
+    }
+
+    private void processChannelNotification(NotificationRequest req, NotificationChannel channel) {
+        try {
+            if (shouldSkipChannel(req, channel)) {
+                return;
+            }
+
+            Notification notification = buildNotification(
+                    req.getUserId(), req.getEmail(), req.getPhoneNumber(),
+                    req.getTitle(), req.getMessage(), req.getType(), channel,
+                    req.getRedirectUrl(), req.getReferenceId(), req.getPriority(),
+                    null, SendMode.SEND_NOW, System.currentTimeMillis(),
+                    defaultMaxRetries, null, null, null
+            );
+
+            if (repository.saveIdempotent(notification)) {
+                logChannelSuccess(req.getUserId(), channel);
+            } else {
+                log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
+            }
+        } catch (Exception e) {
+            log.error("Failed to process channel {} for user {}", channel, req.getUserId(), e);
+        }
+    }
+
+    private boolean shouldSkipChannel(NotificationRequest req, NotificationChannel channel) {
+        if (channel == NotificationChannel.EMAIL && isBlank(req.getEmail())) {
+            log.warn("Skipping EMAIL for user {} due to missing email address.", req.getUserId());
+            return true;
+        }
+        if (channel == NotificationChannel.SMS && isBlank(req.getPhoneNumber())) {
+            log.warn("Skipping SMS for user {} due to missing phone number.", req.getUserId());
+            return true;
+        }
+        return false;
+    }
+
+    private void logChannelSuccess(String userId, NotificationChannel channel) {
+        switch (channel) {
+            case IN_APP -> log.info("IN_APP notification created for user {}", userId);
+            case EMAIL -> log.info("EMAIL notification queued for user {}", userId);
+            case SMS -> log.info("SMS notification queued for user {}", userId);
+            default -> log.info("{} notification processed for user {}", channel, userId);
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    // ==========================================
+    // Remaining Service Methods
+    // ==========================================
 
     public void schedule(ScheduledNotificationRequest req) {
         Notification n = new Notification();
@@ -396,7 +427,7 @@ public class NotificationService {
         n.setSendMode(SendMode.SCHEDULED);
         n.setScheduledAt(req.getScheduledTime());
         n.setCreatedAt(System.currentTimeMillis());
-        
+
         repository.save(n);
     }
 

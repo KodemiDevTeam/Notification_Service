@@ -86,14 +86,14 @@ class NotificationDispatcherTest {
 
     @Test
     void testDispatchEmail_ProviderDisabled() {
-        org.notification.config.ProviderConfigValidator.isEmailEnabled = false;
+        org.springframework.test.util.ReflectionTestUtils.setField(org.notification.config.ProviderConfigValidator.class, "emailEnabled", false);
         try {
             Notification n = new Notification();
             n.setChannel(NotificationChannel.EMAIL);
             
             assertThrows(org.notification.exception.ProviderDisabledException.class, () -> dispatcher.dispatch(n));
         } finally {
-            org.notification.config.ProviderConfigValidator.isEmailEnabled = true;
+            org.springframework.test.util.ReflectionTestUtils.setField(org.notification.config.ProviderConfigValidator.class, "emailEnabled", true);
         }
     }
 
@@ -134,14 +134,14 @@ class NotificationDispatcherTest {
 
     @Test
     void testDispatchSms_ProviderDisabled() {
-        org.notification.config.ProviderConfigValidator.isSmsEnabled = false;
+        org.springframework.test.util.ReflectionTestUtils.setField(org.notification.config.ProviderConfigValidator.class, "smsEnabled", false);
         try {
             Notification n = new Notification();
             n.setChannel(NotificationChannel.SMS);
             
             assertThrows(org.notification.exception.ProviderDisabledException.class, () -> dispatcher.dispatch(n));
         } finally {
-            org.notification.config.ProviderConfigValidator.isSmsEnabled = true;
+            org.springframework.test.util.ReflectionTestUtils.setField(org.notification.config.ProviderConfigValidator.class, "smsEnabled", true);
         }
     }
 

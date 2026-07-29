@@ -2,6 +2,7 @@ package org.notification.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.notification.exception.InvalidJwtException;
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;
@@ -38,12 +39,25 @@ public class JwtUtil {
         }
     }
 
-    private JsonNode getPayload(String token) throws Exception {
-        if (token != null && token.startsWith("Bearer ")) {
+    private JsonNode getPayload(String token) {
+        if (token == null || token.isBlank()) {
+            throw new InvalidJwtException("Token cannot be null or blank");
+        }
+
+        if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
+
         String[] chunks = token.split("\\.");
-        String payloadJson = new String(Base64.getUrlDecoder().decode(chunks[1]));
-        return objectMapper.readTree(payloadJson);
+        if (chunks.length != 3) {
+            throw new InvalidJwtException("Invalid JWT token");
+        }
+
+        try {
+            String payloadJson = new String(Base64.getUrlDecoder().decode(chunks[1]));
+            return objectMapper.readTree(payloadJson);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new InvalidJwtException("Invalid JWT payload", e);
+        }
     }
 }

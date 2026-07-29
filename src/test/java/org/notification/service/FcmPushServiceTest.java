@@ -2,10 +2,8 @@ package org.notification.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.notification.model.DeviceToken;
 import org.notification.repository.DeviceTokenRepository;
 
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;

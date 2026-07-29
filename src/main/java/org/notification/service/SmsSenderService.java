@@ -7,6 +7,7 @@ import com.twilio.type.PhoneNumber;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.notification.exception.PermanentFailureException;
+import org.notification.exception.SmsSendingException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -68,10 +69,10 @@ public class SmsSenderService {
                 throw new PermanentFailureException("Permanent Twilio Error: " + e.getMessage(), e);
             }
             // For other API exceptions (like timeout, server error), throw a standard RuntimeException to retry
-            throw new RuntimeException("Temporary SMS sending failed", e);
+            throw new SmsSendingException("Temporary SMS sending failed", e);
         } catch (Exception e) {
             log.error("Failed to send SMS to {}", normalizedTo, e);
-            throw new RuntimeException("SMS sending failed", e);
+            throw new SmsSendingException("SMS sending failed", e);
         }
     }
 

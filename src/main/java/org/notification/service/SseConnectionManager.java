@@ -36,7 +36,7 @@ public class SseConnectionManager {
             log.info("SSE stream timed out for user {}.", userId);
         });
 
-        emitter.onError((e) -> {
+        emitter.onError(e -> {
             emitters.remove(userId);
             log.info("SSE stream error for user {}: {}", userId, e.getMessage());
         });
