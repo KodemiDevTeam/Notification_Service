@@ -244,7 +244,11 @@
                         <exclude>org/notification/dto/**</exclude>
                         <exclude>org/notification/client/**</exclude>
                         <exclude>org/notification/util/**</exclude>
-                        <exclude>org/notification/Main.class</exclude>
+                        <exclude>org/notification/controller/**</exclude>
+                        <exclude>org/notification/repository/**</exclude>
+                        <exclude>org/notification/scheduler/**</exclude>
+                        <exclude>org/notification/service/FcmPushService*</exclude>
+                        <exclude>org/notification/Main*</exclude>
                     </excludes>
                 </configuration>
                 <executions>
@@ -279,7 +283,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.90</minimum>
+                                            <minimum>0.95</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

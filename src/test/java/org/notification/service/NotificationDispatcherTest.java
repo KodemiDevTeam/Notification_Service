@@ -7,10 +7,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.notification.model.Notification;
 import org.notification.model.enums.NotificationChannel;
+import org.notification.model.enums.NotificationType;
 
-import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
-
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationDispatcherTest {
@@ -20,6 +21,12 @@ class NotificationDispatcherTest {
 
     @Mock
     private SmsSenderService smsSenderService;
+
+    @Mock
+    private FcmPushService fcmPushService;
+
+    @Mock
+    private SseConnectionManager sseConnectionManager;
 
     @InjectMocks
     private NotificationDispatcher dispatcher;
@@ -56,11 +63,25 @@ class NotificationDispatcherTest {
     void testDispatchInApp() {
         Notification n = new Notification();
         n.setChannel(NotificationChannel.IN_APP);
+        n.setUserId("u1");
+        n.setType(NotificationType.GENERAL);
 
         dispatcher.dispatch(n);
 
-        verifyNoInteractions(emailSenderService);
-        verifyNoInteractions(smsSenderService);
+        verify(sseConnectionManager).sendNotification(eq("u1"), any());
+        verify(fcmPushService).sendPushNotification(eq("u1"), any(), any(), any(), any());
+    }
+
+    @Test
+    void testDispatchInApp_exceptionsHandledGracefully() {
+        Notification n = new Notification();
+        n.setChannel(NotificationChannel.IN_APP);
+        n.setUserId("u1");
+
+        doThrow(new RuntimeException("SSE fail")).when(sseConnectionManager).sendNotification(any(), any());
+        doThrow(new RuntimeException("FCM fail")).when(fcmPushService).sendPushNotification(any(), any(), any(), any(), any());
+
+        assertDoesNotThrow(() -> dispatcher.dispatch(n));
     }
 
     @Test
@@ -133,4 +154,3 @@ class NotificationDispatcherTest {
         assertThrows(org.notification.exception.PermanentFailureException.class, () -> dispatcher.dispatch(n));
     }
 }
-

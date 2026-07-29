@@ -55,14 +55,7 @@ public class SmsSenderService {
         }
 
         try {
-            Message message = Message.creator(
-                    new PhoneNumber(normalizedTo),
-                    new PhoneNumber(fromNumber),
-                    body
-            ).create();
-
-            log.info("SMS sent successfully to {}. SID: {}", normalizedTo, message.getSid());
-
+            sendTwilioMessage(normalizedTo, body);
         } catch (ApiException e) {
             log.error("Twilio ApiException while sending SMS to {}", normalizedTo, e);
             String errorMsg = e.getMessage().toLowerCase();
@@ -80,6 +73,15 @@ public class SmsSenderService {
             log.error("Failed to send SMS to {}", normalizedTo, e);
             throw new RuntimeException("SMS sending failed", e);
         }
+    }
+
+    protected void sendTwilioMessage(String to, String body) {
+        Message message = Message.creator(
+                new PhoneNumber(to),
+                new PhoneNumber(fromNumber),
+                body
+        ).create();
+        log.info("SMS sent successfully to {}. SID: {}", to, message.getSid());
     }
 
     private String normalizePhoneNumber(String phoneNumber) {

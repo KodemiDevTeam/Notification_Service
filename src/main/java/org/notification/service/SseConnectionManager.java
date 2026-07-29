@@ -15,9 +15,13 @@ public class SseConnectionManager {
     // Map of userId -> SseEmitter
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
+    protected SseEmitter createEmitter(long timeoutMs) {
+        return new SseEmitter(timeoutMs);
+    }
+
     public SseEmitter subscribe(String userId) {
         // Create an emitter with 1 hour timeout (3600000 ms)
-        SseEmitter emitter = new SseEmitter(3600000L);
+        SseEmitter emitter = createEmitter(3600000L);
         
         emitters.put(userId, emitter);
         log.info("User {} connected to SSE notification stream.", userId);

@@ -257,7 +257,7 @@ class NotificationServiceTest {
 
         notificationService.sendInternal(req);
 
-        assertEquals(List.of("EMAIL"), req.getChannels());
+        assertEquals(List.of(NotificationChannel.EMAIL), req.getChannels());
         verify(repository, times(1)).saveIdempotent(any());
     }
 
@@ -273,7 +273,7 @@ class NotificationServiceTest {
 
         notificationService.sendInternal(req);
 
-        assertEquals(List.of("IN_APP"), req.getChannels());
+        assertEquals(List.of(NotificationChannel.IN_APP), req.getChannels());
         verify(repository, times(1)).saveIdempotent(any());
     }
 
@@ -282,7 +282,7 @@ class NotificationServiceTest {
         NotificationRequest req = new NotificationRequest();
         req.setUserId("u1");
         req.setType(NotificationType.GENERAL);
-        req.setChannels(Arrays.asList("EMAIL", "SMS"));
+        req.setChannels(Arrays.asList(NotificationChannel.EMAIL, NotificationChannel.SMS));
         req.setTitle("T");
         req.setMessage("M");
 
@@ -305,7 +305,7 @@ class NotificationServiceTest {
         NotificationRequest req = new NotificationRequest();
         req.setUserId("u1");
         req.setType(NotificationType.GENERAL);
-        req.setChannels(Arrays.asList("EMAIL"));
+        req.setChannels(Arrays.asList(NotificationChannel.EMAIL));
         req.setTitle("T");
         req.setMessage("M");
 
@@ -322,7 +322,7 @@ class NotificationServiceTest {
         NotificationRequest req = new NotificationRequest();
         req.setUserId("u1");
         req.setType(NotificationType.GENERAL);
-        req.setChannels(Arrays.asList("EMAIL", "SMS", "IN_APP"));
+        req.setChannels(Arrays.asList(NotificationChannel.EMAIL, NotificationChannel.SMS, NotificationChannel.IN_APP));
         req.setTitle("T");
         req.setMessage("M");
 
@@ -338,28 +338,11 @@ class NotificationServiceTest {
     }
 
     @Test
-    void testSendInternal_InvalidChannel() {
-        NotificationRequest req = new NotificationRequest();
-        req.setUserId("u1");
-        req.setType(NotificationType.GENERAL);
-        req.setChannels(Arrays.asList("INVALID_CHANNEL", "IN_APP"));
-        req.setTitle("T");
-        req.setMessage("M");
-
-        when(repository.saveIdempotent(any())).thenReturn(true);
-
-        // INVALID_CHANNEL throws IllegalArgumentException in valueOf, which is caught. IN_APP should still run.
-        notificationService.sendInternal(req);
-
-        verify(repository, times(1)).saveIdempotent(any());
-    }
-
-    @Test
     void testSendInternal_DuplicateSave() {
         NotificationRequest req = new NotificationRequest();
         req.setUserId("u1");
         req.setType(NotificationType.GENERAL);
-        req.setChannels(List.of("IN_APP"));
+        req.setChannels(List.of(NotificationChannel.IN_APP));
         req.setTitle("T");
         req.setMessage("M");
 
