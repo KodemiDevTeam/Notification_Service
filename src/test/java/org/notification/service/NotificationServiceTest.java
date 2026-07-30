@@ -557,5 +557,56 @@ class NotificationServiceTest {
 
         verify(repository, times(2)).delete(any());
     }
+
+    @Test
+    void testRescheduleBatch_NullTime_DoesNothing() {
+        notificationService.rescheduleBatch("batch1", null);
+        verify(repository, never()).findByBatchId(any());
+    }
+
+    @Test
+    void testMarkAsRead_NullOrAlreadyRead() {
+        when(repository.findById("n1")).thenReturn(null);
+        notificationService.markAsRead("n1");
+
+        Notification alreadyRead = new Notification();
+        alreadyRead.setRead(true);
+        when(repository.findById("n2")).thenReturn(alreadyRead);
+        notificationService.markAsRead("n2");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void testBroadcast_NullChannels() {
+        BroadcastNotificationRequest req = new BroadcastNotificationRequest();
+        req.setTargetRole("LEARNER");
+        req.setSendMode(SendMode.SEND_NOW);
+        req.setChannels(null);
+
+        UserNotificationTargetDTO target = new UserNotificationTargetDTO();
+        target.setUserId("u1");
+
+        when(userClient.getUsersForNotification("LEARNER")).thenReturn(List.of(target));
+
+        BroadcastNotificationResponse response = notificationService.broadcast(req);
+        assertEquals(0, response.getTotalNotificationsCreated());
+    }
+
+    @Test
+    void testSendImmediate_DuplicateSave() {
+        NotificationRequest req = new NotificationRequest();
+        req.setUserId("u1");
+        req.setChannel(NotificationChannel.SMS);
+        req.setPhoneNumber("+919999999999");
+        req.setTitle("Immediate");
+        req.setType(NotificationType.GENERAL);
+
+        when(repository.saveIdempotent(any())).thenReturn(false);
+
+        notificationService.sendImmediate(req);
+        verify(repository, times(1)).saveIdempotent(any());
+    }
 }
+
 

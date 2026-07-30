@@ -199,5 +199,49 @@ class NotificationSchedulerTest {
         inOrder.verify(dispatcher).dispatch(n2);
         inOrder.verify(dispatcher).dispatch(n1);
     }
+
+    @Test
+    void testProcessPendingNotifications_ProviderDisabled() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+        n.setSendMode(SendMode.SEND_NOW);
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.acquireLock("n1", NotificationStatus.PENDING, NotificationStatus.PROCESSING)).thenReturn(true);
+
+        doThrow(new org.notification.exception.ProviderDisabledException("EMAIL_DISABLED")).when(dispatcher).dispatch(n);
+
+        scheduler.processPendingNotifications();
+
+        verify(repository, times(1)).save(n);
+        assertEquals(NotificationStatus.SKIPPED, n.getStatus());
+        assertEquals("EMAIL_DISABLED", n.getFailureReason());
+    }
+
+    @Test
+    void testProcessPendingNotifications_LockException() {
+        Notification n = new Notification();
+        n.setNotificationId("n1");
+        n.setStatus(NotificationStatus.PENDING);
+
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of(n));
+        when(repository.acquireLock("n1", NotificationStatus.PENDING, NotificationStatus.PROCESSING)).thenThrow(new RuntimeException("Lock Error"));
+
+        scheduler.processPendingNotifications();
+
+        verify(dispatcher, never()).dispatch(any());
+    }
+
+    @Test
+    void testProcessPendingNotifications_EmptyDueList() {
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.PENDING))).thenReturn(List.of());
+        when(repository.findDueNotifications(anyLong(), anyInt(), eq(NotificationStatus.RETRY_SCHEDULED))).thenReturn(List.of());
+
+        scheduler.processPendingNotifications();
+
+        verify(dispatcher, never()).dispatch(any());
+    }
 }
+
 

@@ -31,6 +31,12 @@ class NotificationDispatcherTest {
     @InjectMocks
     private NotificationDispatcher dispatcher;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(org.notification.config.ProviderConfigValidator.class, "emailEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(org.notification.config.ProviderConfigValidator.class, "smsEnabled", true);
+    }
+
     @Test
     void testDispatchEmail() {
         Notification n = new Notification();
@@ -153,4 +159,12 @@ class NotificationDispatcherTest {
 
         assertThrows(org.notification.exception.PermanentFailureException.class, () -> dispatcher.dispatch(n));
     }
+
+    @Test
+    void testDispatchUnknownChannel() {
+        Notification n = new Notification();
+        n.setChannel(null);
+        assertThrows(NullPointerException.class, () -> dispatcher.dispatch(n));
+    }
 }
+

@@ -238,16 +238,6 @@
                 <version>${jacoco.version}</version>
                 <configuration>
                     <excludes>
-                        <exclude>org/notification/config/**</exclude>
-                        <exclude>org/notification/exception/**</exclude>
-                        <exclude>org/notification/model/**</exclude>
-                        <exclude>org/notification/dto/**</exclude>
-                        <exclude>org/notification/client/**</exclude>
-                        <exclude>org/notification/util/**</exclude>
-                        <exclude>org/notification/controller/**</exclude>
-                        <exclude>org/notification/repository/**</exclude>
-                        <exclude>org/notification/scheduler/**</exclude>
-                        <exclude>org/notification/service/FcmPushService*</exclude>
                         <exclude>org/notification/Main*</exclude>
                     </excludes>
                 </configuration>

@@ -309,4 +309,101 @@ class NotificationControllerTest {
         assertEquals(HttpStatus.OK, res.getStatusCode());
         verify(notificationService, times(1)).clearUserNotifications("u1");
     }
+
+    @Test
+    void testStreamNotifications_Success() {
+        when(jwtUtil.extractUserId("test-token")).thenReturn("u1");
+        org.notification.service.SseConnectionManager sseManager = mock(org.notification.service.SseConnectionManager.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "sseConnectionManager", sseManager);
+
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
+        when(sseManager.subscribe("u1")).thenReturn(emitter);
+
+        ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.SseEmitter> res = controller.streamNotifications("u1", "Bearer test-token", null);
+
+        assertEquals(HttpStatus.OK, res.getStatusCode());
+        assertEquals(emitter, res.getBody());
+    }
+
+    @Test
+    void testStreamNotifications_QueryParamToken() {
+        when(jwtUtil.extractUserId("query-token")).thenReturn("u1");
+        org.notification.service.SseConnectionManager sseManager = mock(org.notification.service.SseConnectionManager.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "sseConnectionManager", sseManager);
+
+        ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.SseEmitter> res = controller.streamNotifications("u1", null, "query-token");
+
+        assertEquals(HttpStatus.OK, res.getStatusCode());
+    }
+
+    @Test
+    void testStreamNotifications_UnauthorizedAndForbidden() {
+        ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.SseEmitter> unauth = controller.streamNotifications("u1", null, null);
+        assertEquals(HttpStatus.UNAUTHORIZED, unauth.getStatusCode());
+
+        when(jwtUtil.extractUserId("token1")).thenReturn("u2");
+        ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.SseEmitter> forbidden = controller.streamNotifications("u1", "Bearer token1", null);
+        assertEquals(HttpStatus.FORBIDDEN, forbidden.getStatusCode());
+    }
+
+    @Test
+    void testRegisterDeviceToken_Success() {
+        org.notification.repository.DeviceTokenRepository repo = mock(org.notification.repository.DeviceTokenRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "deviceTokenRepository", repo);
+
+        when(jwtUtil.extractUserId("token1")).thenReturn("u1");
+        when(repo.findByToken("dt1")).thenReturn(null);
+
+        Map<String, String> body = Map.of("token", "dt1", "platform", "IOS");
+        ResponseEntity<Map<String, String>> res = controller.registerDeviceToken("Bearer token1", body);
+
+        assertEquals(HttpStatus.OK, res.getStatusCode());
+        verify(repo, times(1)).save(any());
+    }
+
+    @Test
+    void testRegisterDeviceToken_BadRequestAndUnauth() {
+        ResponseEntity<Map<String, String>> unauth = controller.registerDeviceToken("Bearer badtoken", Map.of("token", "dt1"));
+        assertEquals(HttpStatus.UNAUTHORIZED, unauth.getStatusCode());
+
+        when(jwtUtil.extractUserId("token1")).thenReturn("u1");
+        ResponseEntity<Map<String, String>> badReq = controller.registerDeviceToken("Bearer token1", Map.of("token", ""));
+        assertEquals(HttpStatus.BAD_REQUEST, badReq.getStatusCode());
+    }
+
+    @Test
+    void testDeregisterDeviceToken_Success() {
+        org.notification.repository.DeviceTokenRepository repo = mock(org.notification.repository.DeviceTokenRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "deviceTokenRepository", repo);
+
+        when(jwtUtil.extractUserId("token1")).thenReturn("u1");
+        org.notification.model.DeviceToken existing = new org.notification.model.DeviceToken();
+        existing.setUserId("u1");
+        existing.setToken("dt1");
+        when(repo.findByToken("dt1")).thenReturn(existing);
+
+        ResponseEntity<Map<String, String>> res = controller.deregisterDeviceToken("Bearer token1", Map.of("token", "dt1"));
+
+        assertEquals(HttpStatus.OK, res.getStatusCode());
+        verify(repo, times(1)).delete(existing);
+    }
+
+    @Test
+    void testDeregisterDeviceToken_NotFoundOrUnauth() {
+        org.notification.repository.DeviceTokenRepository repo = mock(org.notification.repository.DeviceTokenRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "deviceTokenRepository", repo);
+
+        ResponseEntity<Map<String, String>> unauth = controller.deregisterDeviceToken("Bearer badtoken", Map.of("token", "dt1"));
+        assertEquals(HttpStatus.UNAUTHORIZED, unauth.getStatusCode());
+
+        when(jwtUtil.extractUserId("token1")).thenReturn("u1");
+        ResponseEntity<Map<String, String>> badReq = controller.deregisterDeviceToken("Bearer token1", Map.of());
+        assertEquals(HttpStatus.BAD_REQUEST, badReq.getStatusCode());
+
+        when(repo.findByToken("dt1")).thenReturn(null);
+        ResponseEntity<Map<String, String>> notFound = controller.deregisterDeviceToken("Bearer token1", Map.of("token", "dt1"));
+        assertEquals(HttpStatus.OK, notFound.getStatusCode());
+        assertEquals("No matching device token found.", notFound.getBody().get("message"));
+    }
 }
+

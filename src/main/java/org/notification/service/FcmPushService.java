@@ -53,7 +53,7 @@ public class FcmPushService {
                         .putData("referenceId", referenceId != null ? referenceId : "")
                         .build();
 
-                String response = FirebaseMessaging.getInstance().send(message);
+                String response = sendFirebaseMessage(message);
                 log.info("Successfully sent push notification to token {}. Response: {}", deviceToken.getToken(), response);
                 
             } catch (com.google.firebase.messaging.FirebaseMessagingException e) {
@@ -71,4 +71,9 @@ public class FcmPushService {
             }
         }
     }
+
+    protected String sendFirebaseMessage(Message message) throws com.google.firebase.messaging.FirebaseMessagingException {
+        return FirebaseMessaging.getInstance().send(message);
+    }
+
 }

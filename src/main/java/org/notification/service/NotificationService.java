@@ -51,9 +51,25 @@ public class NotificationService {
     @Value("${internal.service.key:default-secret}")
     private String internalServiceKey;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.cache.CacheManager cacheManager;
+
     public NotificationService(NotificationRepository repository, UserClient userClient) {
         this.repository = repository;
         this.userClient = userClient;
+    }
+
+    private void evictNotificationCache(String userId) {
+        if (userId != null && cacheManager != null) {
+            try {
+                org.springframework.cache.Cache userNotifs = cacheManager.getCache("userNotifications");
+                if (userNotifs != null) userNotifs.evict(userId);
+                org.springframework.cache.Cache unreadCount = cacheManager.getCache("unreadCount");
+                if (unreadCount != null) unreadCount.evict(userId);
+            } catch (Exception e) {
+                log.warn("Failed to evict notification cache for user {}: {}", userId, e.getMessage());
+            }
+        }
     }
 
     public BroadcastNotificationResponse broadcast(BroadcastNotificationRequest req) {
@@ -376,6 +392,7 @@ public class NotificationService {
 
             if (repository.saveIdempotent(notification)) {
                 logChannelSuccess(req.getUserId(), channel);
+                evictNotificationCache(req.getUserId());
             } else {
                 log.info("Duplicate internal notification skipped for user {} channel {}", req.getUserId(), channel);
             }
