@@ -77,14 +77,14 @@ pipeline {
                 withSonarQubeEnv('sonarscanner') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                            echo "===== SONAR ANALYSIS ====="
+    echo "===== SONAR ANALYSIS ====="
 
-                            mvn -B sonar:sonar \
-                            -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-                            -Dsonar.projectName=$SONAR_PROJECT_NAME \
-                            -Dsonar.login=$SONAR_TOKEN \
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                        '''
+    mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+      -Dsonar.projectKey=Notification-Service \
+      -Dsonar.projectName=Notification-Service \
+      -Dsonar.token=$SONAR_TOKEN \
+      -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+'''
                     }
                 }
             }
