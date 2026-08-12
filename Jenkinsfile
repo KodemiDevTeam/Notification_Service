@@ -74,7 +74,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube2') {
+                withSonarQubeEnv('sonarscanner') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
                             echo "===== SONAR ANALYSIS ====="
