@@ -35,29 +35,46 @@ pipeline {
             steps {
                 bat '''
                     echo ===== WORKSPACE DEBUG =====
-                    echo Current Directory:
                     cd
-
                     echo.
-                    echo Workspace Contents:
+                    echo ===== FILES =====
                     dir
+                    echo.
+                    echo ===== POM FILES =====
+                    dir /s /b pom.xml
+                '''
+            }
+        }
+
+        stage('Verify Java & Maven') {
+            steps {
+                bat '''
+                    echo ===== JAVA VERSION =====
+                    java -version
 
                     echo.
-                    echo POM Files:
-                    dir /s /b pom.xml
+                    echo ===== JAVA HOME =====
+                    echo %JAVA_HOME%
+
+                    echo.
+                    echo ===== MAVEN VERSION =====
+                    mvn --version
+
+                    echo.
+                    echo ===== MAVEN HOME =====
+                    echo %MAVEN_HOME%
                 '''
             }
         }
 
         /* ================= BUILD ================= */
 
-        stage('Build (No Tests)') {
+        stage('Build') {
             steps {
                 bat '''
-                    echo ===== BUILD WITHOUT TESTS =====
+                    echo ===== BUILDING APPLICATION =====
 
-                    mvn -B clean install ^
-                    -Dmaven.test.skip=true ^
+                    mvn -B clean compile ^
                     -Deureka.client.enabled=false ^
                     -Dspring.cloud.discovery.enabled=false
                 '''
@@ -69,11 +86,39 @@ pipeline {
         stage('Test & Coverage') {
             steps {
                 bat '''
-                    echo ===== RUNNING TESTS WITH JACOCO =====
+                    echo ===== RUNNING UNIT TESTS =====
 
                     mvn -B test ^
                     -Deureka.client.enabled=false ^
                     -Dspring.cloud.discovery.enabled=false
+
+                    echo.
+                    echo ===== TEST EXECUTION COMPLETED =====
+                '''
+            }
+        }
+
+        /* ================= VERIFY TEST RESULTS ================= */
+
+        stage('Verify Test Results') {
+            steps {
+                bat '''
+                    echo ===== TEST REPORTS =====
+
+                    if exist target\\surefire-reports (
+                        dir target\\surefire-reports
+                    ) else (
+                        echo WARNING: target\\surefire-reports not found
+                    )
+
+                    echo.
+                    echo ===== JACOCO REPORT =====
+
+                    if exist target\\site\\jacoco\\jacoco.xml (
+                        echo JaCoCo XML report found.
+                    ) else (
+                        echo WARNING: JaCoCo XML report not found.
+                    )
                 '''
             }
         }
@@ -90,7 +135,7 @@ pipeline {
                         )
                     ]) {
                         bat '''
-                            echo ===== SONAR ANALYSIS =====
+                            echo ===== SONARQUBE ANALYSIS =====
 
                             mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar ^
                               -Dsonar.projectKey=Notification-Service ^
@@ -113,7 +158,7 @@ pipeline {
                             waitForQualityGate abortPipeline: false
                         }
                     } catch (Exception e) {
-                        echo "Quality Gate skipped"
+                        echo "Quality Gate skipped: ${e.getMessage()}"
                     }
                 }
             }
@@ -123,21 +168,21 @@ pipeline {
 
         stage('OWASP Dependency Check') {
             steps {
-
                 withCredentials([
                     string(
                         credentialsId: 'nvd-api-key',
                         variable: 'NVD_KEY'
                     )
                 ]) {
-
                     dependencyCheck(
                         additionalArguments: "--nvdApiKey ${NVD_KEY} --format XML --out . --disableOssIndex",
                         odcInstallation: 'Default'
                     )
                 }
 
-                dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+                dependencyCheckPublisher(
+                    pattern: 'dependency-check-report.xml'
+                )
             }
         }
 
@@ -156,11 +201,11 @@ pipeline {
     post {
 
         success {
-            echo 'SUCCESS: Build + Sonar + OWASP completed'
+            echo 'SUCCESS: Build + Tests + Coverage + SonarQube + OWASP completed'
         }
 
         failure {
-            echo 'FAILED: Check logs'
+            echo 'FAILED: Check Jenkins console logs'
         }
 
         always {
